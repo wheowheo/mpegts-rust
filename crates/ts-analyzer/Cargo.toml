@@ -1,0 +1,10 @@
+[package]
+name = "ts-analyzer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ts-core = { path = "../ts-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
