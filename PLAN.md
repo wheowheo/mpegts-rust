@@ -95,7 +95,7 @@
 
 ---
 
-## Phase 13 - HEX 에디터 뷰
+## Phase 13 - HEX 에디터 뷰 [done]
 - 백엔드: 패킷 raw bytes 저장 (PID별 최근 N개 패킷 원본 보관)
 - API: GET /api/pids/:pid/packets (offset, limit)
 - HEX 뷰어 컴포넌트: 주소 | hex dump | ASCII
@@ -111,7 +111,7 @@
 - PID 상세 페이지에서 클릭 시 해당 패킷 HEX 뷰 열기
 - PSI 섹션도 HEX 뷰 지원 (table_id, section_length, CRC 하이라이팅)
 
-## Phase 14 - 프레임 레벨 디코딩 엔진
+## Phase 14 - 프레임 레벨 디코딩 엔진 [done]
 - crates/ts-decoder 신규 crate 생성
 - NAL unit 파서: H.264 (AnnexB, start code 탐색)
   - SPS 파싱: profile, level, resolution, frame_mbs, chroma_format
@@ -133,7 +133,7 @@
 - API: GET /api/pids/:pid/frames (frame list with type, size, PTS, DTS)
 - API: GET /api/pids/:pid/frames/:idx (개별 프레임 상세)
 
-## Phase 15 - 프레임 정보 대시보드
+## Phase 15 - 프레임 정보 대시보드 [done]
 - 프레임 타임라인 뷰: I/P/B 프레임 시퀀스 시각화
   - I 프레임: 큰 빨강 블록, P: 중간 파랑, B: 작은 초록
   - GOP 구조 시각화 (GOP 경계선, IDR 마커)
@@ -145,7 +145,7 @@
 - PTS/DTS 그래프: 프레임별 타이밍 + AV sync 차이
 - 프레임 간격 분석: frame duration 일정성 검증
 
-## Phase 16 - 프록시 썸네일 디코더
+## Phase 16 - 프록시 썸네일 디코더 [done]
 - ffmpeg FFI 연동 (ffmpeg-sys-next 또는 ac-ffmpeg 크레이트)
   - CLI 호출 지양, libav* 직접 바인딩
   - I-frame only 디코딩 → JPEG/WebP 썸네일 추출
@@ -157,7 +157,7 @@
 - 프레임 클릭 시 해당 위치 썸네일 표시
 - 라이브 스트림: 주기적 snapshot 캡처
 
-## Phase 17 - 라이브 스트림 입력 (실시간 계측)
+## Phase 17 - 라이브 스트림 입력 (실시간 계측) [done]
 - ingest/udp.rs 본격 구현
   - UDP 멀티캐스트 수신 (igmp join)
   - RTP 디캡슐레이션 (RTP header strip → TS 패킷 추출)
@@ -175,7 +175,7 @@
 - 대시보드: 실시간 갱신 (비트레이트, PID, CC 에러, PCR 지터 연속 모니터링)
 - 스트림 전환 시 자동 PAT/PMT 재감지
 
-## Phase 18 - TR 101 290 계측 (Priority 1/2/3)
+## Phase 18 - TR 101 290 계측 (Priority 1/2/3) [done]
 - Priority 1 (필수 모니터링 - 서비스 불가 수준)
   - TS sync loss: 연속 sync byte 실패 감지
   - Sync byte error: 0x47 아닌 바이트
@@ -209,7 +209,7 @@
 - 임계값 설정 UI: 각 항목별 경고 임계값 커스터마이즈
 - 에러 로그 CSV/JSON 내보내기
 
-## Phase 19 - CMA-1820 수준 UI 통합
+## Phase 19 - CMA-1820 수준 UI 통합 [done]
 - 메인 대시보드 재구성: 멀티 패널 레이아웃
   - 좌측: 스트림 셀렉터 (파일 목록 / 라이브 입력 목록)
   - 중앙 상단: 오실로스코프 (비트레이트 + PCR 지터 듀얼 축)
@@ -234,7 +234,7 @@
 - 세션 저장/불러오기: 분석 결과 스냅샷 저장
 - 보고서 생성: PDF/HTML 리포트 (분석 요약, 에러 목록, 차트 포함)
 
-## Phase 20 - 경량 로컬 데이터베이스 (히스토리 관리)
+## Phase 20 - 경량 로컬 데이터베이스 (히스토리 관리) [done]
 - SQLite 탑재 (rusqlite 또는 sqlx + SQLite)
 - 스키마 설계
   - sessions: 분석 세션 (id, filename/url, start_time, end_time, duration, total_packets, bitrate)
@@ -266,7 +266,7 @@
 - DB 마이그레이션: 버전별 스키마 업그레이드 (embedded migrations)
 - 단일 바이너리: SQLite 파일 하나로 portable (data/ts-engine.db)
 
-## Phase 21 - 성능 최적화 및 프로덕션
+## Phase 21 - 성능 최적화 및 프로덕션 [done]
 - Rust 멀티스레드 분석 파이프라인 (rayon 또는 tokio 병렬)
 - 대용량 파일 랜덤 액세스 (mmap 기반)
 - WebSocket 메시지 압축 (MessagePack 또는 CBOR)

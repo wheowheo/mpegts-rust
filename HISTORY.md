@@ -81,3 +81,76 @@
 - API 확장: POST start, POST stop/{id}, POST stop (all), GET list, GET {id}
 - 자동 경고: 비트레이트 이탈 5% warning, 15% critical
 - Dashboard: 다중 세션 목록, 세션별 경고 표시, 전체 요약 카드
+
+## Phase 12 - Dashboard: 계측기 수준 UI 리디자인
+- 방송 계측기 스타일 전체 테마
+- 7-segment 디스플레이, LED 인디케이터
+- PID 상세 파서 (transport/adaptation/PCR/PES/descriptor)
+- Dolby 전체 지원
+
+## Phase 13 - HEX 에디터 뷰
+- PID별 최근 64개 패킷 원본 저장 (StreamAnalyzer)
+- GET /api/pids/:pid/packets (offset, limit)
+- HexViewer 컴포넌트: hex dump + ASCII + 컬러 하이라이팅
+- sync=빨강, header=시안, AF=노랑, PCR=마젠타, PES=그린
+- 마우스 호버 시 필드 이름/값 툴팁
+
+## Phase 14 - 프레임 레벨 디코딩 엔진
+- ts-decoder crate 신규 생성
+- H.264 NAL 파서: SPS, PPS, slice header 파싱
+- H.265/HEVC NAL 파서: VPS, SPS, PPS, slice header
+- AC-3/E-AC-3 프레임 파서 (Atmos JOC 감지)
+- AAC ADTS 프레임 파서
+- BitReader: Exp-Golomb 디코딩
+- FrameIndexer: PES → frame 인덱스 구축
+- API: GET /api/pids/:pid/frames, /frames/:idx
+
+## Phase 15 - 프레임 정보 대시보드
+- FrameTimeline 컴포넌트: I/P/B 시퀀스 시각화
+- GOP 경계 마커, 프레임 크기 바 차트
+- 프레임 상세 패널 (코덱, 해상도, 프로파일, 타이밍)
+- PTS/DTS 타이밍 테이블
+- 오디오 프레임 분석 (채널 레이아웃, Atmos)
+
+## Phase 16 - 프록시 썸네일 디코더
+- ThumbnailExtractor: I-frame 기반 캡처 인프라
+- API: GET /api/pids/:pid/thumbnails, /thumbnail/:idx
+- ThumbnailStrip 컴포넌트
+- 실제 디코딩은 ffmpeg 라이브러리 필요 (placeholder)
+
+## Phase 17 - 라이브 스트림 입력
+- UDP 멀티캐스트 수신 (IGMP join)
+- RTP 디캡슐레이션 (헤더 스트리핑, 확장 처리)
+- HTTP/HLS 폴링 수신 (reqwest)
+- ingest API: POST start/stop, GET status
+- IngestControl 컴포넌트 (URL 입력, 프리셋, 프로토콜 자동 감지)
+- watch 채널 기반 graceful stop
+
+## Phase 18 - TR 101 290 계측
+- P1: sync loss, sync byte error, PAT/PMT/CC/PID error
+- P2: TEI, CRC, PCR interval/accuracy/repetition error
+- P3: NIT/SDT interval, unreferenced PID
+- Tr101290Checker: StreamAnalyzer 파이프라인 통합
+- API: GET /api/tr101290, /tr101290/errors
+- Tr101290Dashboard 컴포넌트: 우선순위별 카운터, 에러 로그
+- /errors 페이지
+
+## Phase 19 - CMA-1820 수준 UI 통합
+- 사이드바: 파일 입력, 라이브 입력, TR 101 290 미니 요약
+- 탭 기반 상세 뷰: TRANSPORT, PROGRAMS, PIDS, TIMING, ERRORS, OUTPUT
+- 듀얼 축 오실로스코프 (비트레이트 + PCR 지터)
+- 반응형 그리드 레이아웃
+
+## Phase 20 - 경량 로컬 데이터베이스
+- rusqlite + bundled SQLite, WAL 모드
+- 스키마: sessions, pid_snapshots, errors, bitrate_history
+- 파일 분석 완료 시 자동 기록
+- history API: 세션 CRUD, 비트레이트 시계열, 통계
+- 30일 보존 정책 + 자동 정리
+- /history 페이지: 세션 목록, 통계 요약
+
+## Phase 21 - 성능 최적화 및 프로덕션
+- mmap 기반 대용량 파일 분석
+- Dockerfile: 멀티 스테이지 빌드 (Rust + Node + slim)
+- GitHub Actions CI: cargo build/test + npm build + docker
+- .dockerignore
