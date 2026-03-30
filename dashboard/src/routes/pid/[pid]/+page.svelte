@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { fetchPidFullDetail } from '$lib/api';
+	import HexViewer from '$lib/components/HexViewer.svelte';
 
 	let detail = $state<any>(null);
 	let error = $state('');
@@ -229,6 +230,12 @@
 			<div class="kv"><span class="k">Last Packet</span><span class="v mono">{detail.last_packet_index.toLocaleString()}</span></div>
 			<div class="kv"><span class="k">Span</span><span class="v mono">{(detail.last_packet_index - detail.first_packet_index).toLocaleString()} packets</span></div>
 		</div>
+	</div>
+
+	<!-- HEX Viewer -->
+	<div class="card">
+		<h3>HEX Viewer</h3>
+		<HexViewer {pid} />
 	</div>
 
 	{/if}

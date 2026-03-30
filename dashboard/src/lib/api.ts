@@ -58,3 +58,14 @@ export async function fetchSystemStats(): Promise<SystemResponse> {
 	const res = await fetch(`${BASE}/system`);
 	return res.json();
 }
+
+export interface PacketHex {
+	index: number;
+	hex: string;
+}
+
+export async function fetchPidPackets(pid: number, offset = 0, limit = 16): Promise<PacketHex[]> {
+	const res = await fetch(`${BASE}/pids/${pid}/packets?offset=${offset}&limit=${limit}`);
+	if (!res.ok) throw new Error(`PID ${pid} packets not found`);
+	return res.json();
+}

@@ -7,7 +7,7 @@ pub mod system_stats;
 pub mod capacity;
 pub mod pid_detail;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use ts_core::packet::{TsPacket, TS_PACKET_SIZE};
 use ts_core::pid::PidMap;
 use ts_core::psi::{PsiSection, pat::Pat, pmt::Pmt};
@@ -39,6 +39,8 @@ pub struct StreamAnalyzer {
     pub pid_details: HashMap<u16, PidDetailCollector>,
     pes_assemblers: HashMap<u16, ts_core::pes::PesAssembler>,
 
+    pub raw_packets: HashMap<u16, VecDeque<Vec<u8>>>,
+
     packet_index: u64,
     filename: String,
 }
@@ -59,6 +61,7 @@ impl StreamAnalyzer {
             psi_buffers: HashMap::new(),
             pid_details: HashMap::new(),
             pes_assemblers: HashMap::new(),
+            raw_packets: HashMap::new(),
             packet_index: 0,
             filename: String::new(),
         }
@@ -79,6 +82,13 @@ impl StreamAnalyzer {
         let has_payload = pkt.header.adaptation_field_control & 0x01 != 0;
         let scrambled = pkt.header.scrambling_control != 0;
         let has_pcr = pkt.adaptation.as_ref().and_then(|a| a.pcr).is_some();
+
+        // raw packet storage (last 64 per PID)
+        let buf = self.raw_packets.entry(pid).or_insert_with(VecDeque::new);
+        buf.push_back(data.to_vec());
+        if buf.len() > 64 {
+            buf.pop_front();
+        }
 
         // PID map
         self.pid_map.update(pid, cc, scrambled, has_pcr);

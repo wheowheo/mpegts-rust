@@ -1,9 +1,9 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ts_analyzer::pid_detail::PidDetailData;
 use crate::state::AppState;
@@ -87,4 +87,41 @@ pub async fn get_pid_full_detail(
 
     let percentage = (info.packet_count as f64 / total) * 100.0;
     Ok(Json(detail.build_detail(info.bitrate_bps, percentage, &info.label, info.stream_type)))
+}
+
+#[derive(Deserialize)]
+pub struct PacketsQuery {
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+pub struct PacketHex {
+    pub index: usize,
+    pub hex: String,
+}
+
+pub async fn get_pid_packets(
+    State(state): State<Arc<AppState>>,
+    Path(pid): Path<u16>,
+    Query(q): Query<PacketsQuery>,
+) -> Result<Json<Vec<PacketHex>>, StatusCode> {
+    let analyzer = state.analyzer.read().await;
+    let packets = analyzer.raw_packets.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
+
+    let offset = q.offset.unwrap_or(0);
+    let limit = q.limit.unwrap_or(16).min(64);
+
+    let result: Vec<PacketHex> = packets
+        .iter()
+        .skip(offset)
+        .take(limit)
+        .enumerate()
+        .map(|(i, data)| PacketHex {
+            index: offset + i,
+            hex: data.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(" "),
+        })
+        .collect();
+
+    Ok(Json(result))
 }
