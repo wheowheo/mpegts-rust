@@ -59,65 +59,185 @@
 
 ---
 
-## Phase 7 - ts-core: 패킷 생성 및 먹싱
+## Phase 7 - ts-core: 패킷 생성 및 먹싱 [done]
 - packet_builder.rs: TS 패킷 생성 (header + adaptation field + payload 조립)
 - psi_builder.rs: PAT/PMT 섹션 생성 (CRC32 포함)
-- pcr_stamper.rs: PCR 삽입 로직 (일정 간격으로 PCR 패킷 생성)
-- null_stuffer.rs: CBR 유지를 위한 null 패킷 삽입
 - muxer.rs: 여러 PID 스트림을 하나의 TS 스트림으로 먹싱
-- 단위 테스트: 생성한 패킷을 다시 파싱해서 round-trip 검증
+- null stuffing, PCR 삽입
+- 단위 테스트: round-trip 검증
 
-## Phase 8 - ts-server: UDP/RTP 멀티캐스트 송출
-- output/udp.rs: UDP 멀티캐스트 송출 (TS over UDP, 7 packets/datagram)
-- output/rtp.rs: RTP 멀티캐스트 송출 (RFC 2250, RTP 헤더 + TS 페이로드)
-- output/pacer.rs: CBR 페이싱 (PCR 기반 타이밍, 버스트 방지)
-- output/mod.rs: OutputSink trait (UDP/RTP 공통 인터페이스)
-- api/output.rs: 송출 제어 API
-  - POST /api/output/start (source, dest_ip, dest_port, protocol, bitrate)
-  - POST /api/output/stop
-  - GET /api/output/status
-- state.rs: 송출 세션 상태 추가 (OutputSession)
-- 소스 지원: 파일 루프 재생, UDP 수신 → 릴레이
+## Phase 8 - ts-server: UDP/RTP 멀티캐스트 송출 [done]
+- output/udp.rs: UDP 멀티캐스트 송출
+- output/rtp.rs: RTP 멀티캐스트 송출 (RFC 2250)
+- output/pacer.rs: CBR 페이싱
+- output/session.rs: 송출 세션 관리
+- api/output.rs: 송출 제어 REST API
 
-## Phase 9 - 송출 품질 모니터링 엔진
-- output_stats.rs: 송출 측 실시간 통계 수집
-  - 실제 송출 비트레이트 vs 목표 비트레이트
-  - 패킷 송출 간격 지터 (inter-packet jitter)
-  - PCR 정확도 (PCR drift from wall clock)
-  - 버퍼 점유율 (송출 큐 사용량)
-- system_stats.rs: 시스템 리소스 모니터링
-  - CPU 사용률 (프로세스 단위)
-  - 네트워크 인터페이스 TX 대역폭, 드롭 카운트
-  - 메모리 사용량
-- capacity.rs: 여유 용량 추정
-  - 현재 부하 대비 추가 가능한 스트림 수 추정
-  - CPU/네트워크 병목 판단
+## Phase 9 - 송출 품질 모니터링 엔진 [done]
+- output_stats.rs: 비트레이트, 지터, PCR 드리프트 수집
+- system_stats.rs: CPU/메모리 모니터링
+- capacity.rs: 여유 스트림 수 추정
+- api/system.rs: 시스템 통계 API
 
-## Phase 10 - Dashboard: 송출 제어 및 안정성 모니터링 UI
-- components/OutputControl.svelte: 송출 시작/정지 폼 (소스, 목적지, 프로토콜, 비트레이트)
-- components/OutputStatus.svelte: 현재 송출 세션 상태 카드
-- components/TxBitrateChart.svelte: 송출 비트레이트 실시간 차트 (목표 vs 실제)
-- components/JitterGauge.svelte: 패킷 간격 지터 게이지
-- components/SystemLoad.svelte: CPU/메모리/네트워크 대역폭 게이지
-- components/CapacityMeter.svelte: "추가 N개 스트림 가능" 여유도 표시
-- routes/output/+page.svelte: 송출 모니터링 페이지
-- stores/output.svelte.ts: 송출 상태 rune store
-- WebSocket 확장: 송출 통계도 실시간 푸시
+## Phase 10 - Dashboard: 송출 모니터링 UI [done]
+- OutputControl, TxBitrateChart, SystemLoad 컴포넌트
+- /output 페이지
 
-## Phase 11 - 다중 스트림 및 안정화
-- 다중 송출 세션 동시 관리 (세션 ID 기반)
-- 세션별 독립 모니터링
-- 자동 경고: CC 에러 급증, 비트레이트 이탈, 지터 임계값 초과
-- 전체 동작 테스트 (파일→UDP, 파일→RTP, UDP→UDP 릴레이)
+## Phase 11 - 다중 스트림 및 안정화 [done]
+- OutputSessionManager: 세션 ID 기반 다중 동시 관리
+- 비트레이트 이탈 자동 경고
 
-## Phase 12 - Dashboard: 계측기 수준 UI 리디자인
-- 전체 테마: 방송 계측기 스타일 다크 UI (짙은 navy/charcoal 배경, 형광 accent)
-- 헤더: 장비 모델명 스타일 로고, 연결 상태 LED 인디케이터, 시계
-- StreamSummary: 큰 숫자 계기판 스타일, 비트레이트 LED 바 그래프
-- PidMap: 컬러 코딩 강화 (video=cyan, audio=green, PSI=yellow, null=gray)
-- BitrateChart: 오실로스코프 스타일 그리드, 형광 그린 라인
-- PcrTimeline: 지터 범위 게이지 + 임계값 라인
-- CcErrors: 에러 카운터 7-segment 디스플레이 스타일
-- PsiViewer: 트리 구조 블록 다이어그램 스타일
-- Drop zone: 장비 패널 슬롯 스타일
-- 반응형 그리드 레이아웃 최적화
+## Phase 12 - Dashboard: 계측기 수준 UI 리디자인 [done]
+- 방송 계측기 스타일 전체 테마
+- 7-segment 디스플레이, LED 인디케이터, 오실로스코프 차트
+- PID 상세 파서 (transport/adaptation/PCR/PES/descriptor)
+- Dolby 전체 지원 (AC-3, E-AC-3, Atmos JOC, AC-4, Vision, TrueHD)
+
+---
+
+## Phase 13 - HEX 에디터 뷰
+- 백엔드: 패킷 raw bytes 저장 (PID별 최근 N개 패킷 원본 보관)
+- API: GET /api/pids/:pid/packets (offset, limit)
+- HEX 뷰어 컴포넌트: 주소 | hex dump | ASCII
+- 영역별 컬러 하이라이팅
+  - sync byte (0x47): 빨강
+  - TS header (byte 1-3): 시안
+  - adaptation field: 노랑
+  - PCR 6 bytes: 마젠타
+  - PES start code (00 00 01): 그린
+  - PES header: 라임
+  - payload: 기본색
+- 마우스 호버 시 해당 필드 이름/값 툴팁 표시
+- PID 상세 페이지에서 클릭 시 해당 패킷 HEX 뷰 열기
+- PSI 섹션도 HEX 뷰 지원 (table_id, section_length, CRC 하이라이팅)
+
+## Phase 14 - 프레임 레벨 디코딩 엔진
+- crates/ts-decoder 신규 crate 생성
+- NAL unit 파서: H.264 (AnnexB, start code 탐색)
+  - SPS 파싱: profile, level, resolution, frame_mbs, chroma_format
+  - PPS 파싱: entropy_coding_mode, num_ref_frames
+  - slice header: slice_type (I/P/B), frame_num, POC
+- NAL unit 파서: H.265/HEVC
+  - VPS 파싱: max_layers, max_sub_layers, general_profile
+  - SPS 파싱: chroma_format, resolution, bit_depth, log2_max_poc
+  - PPS 파싱: tiles, WPP, deblocking
+  - slice segment header: slice_type, POC, reference picture set
+- AC-3/E-AC-3 프레임 파서
+  - syncinfo: fscod, frmsizecod, bsid
+  - BSI: bsmod, acmod, lfeon, dialnorm, compre
+  - Atmos JOC 메타데이터 감지
+- AAC 프레임 파서 (ADTS header)
+  - profile, sampling_frequency_index, channel_configuration
+  - frame_length, number_of_raw_data_blocks
+- 프레임 인덱스 구축: packet_index → frame 매핑
+- API: GET /api/pids/:pid/frames (frame list with type, size, PTS, DTS)
+- API: GET /api/pids/:pid/frames/:idx (개별 프레임 상세)
+
+## Phase 15 - 프레임 정보 대시보드
+- 프레임 타임라인 뷰: I/P/B 프레임 시퀀스 시각화
+  - I 프레임: 큰 빨강 블록, P: 중간 파랑, B: 작은 초록
+  - GOP 구조 시각화 (GOP 경계선, IDR 마커)
+  - 프레임 크기 바 차트 (프레임별 byte size)
+- 프레임 상세 패널
+  - 비디오: slice_type, QP, reference frames, POC, display order
+  - 오디오: 채널 레이아웃, 샘플레이트, 비트레이트, 다이얼로그 노멀라이제이션
+- SPS/PPS/VPS 뷰어: 모든 필드 계측기 스타일 표시
+- PTS/DTS 그래프: 프레임별 타이밍 + AV sync 차이
+- 프레임 간격 분석: frame duration 일정성 검증
+
+## Phase 16 - 프록시 썸네일 디코더
+- ffmpeg 연동 (Command 또는 FFI)
+  - I-frame only 디코딩 → JPEG/WebP 썸네일 추출
+  - 지정 간격 (예: 1초마다) 썸네일 생성
+  - 해상도: 320px 폭 고정 (프록시 용도)
+- API: GET /api/pids/:pid/thumbnails (thumbnail list)
+- API: GET /api/pids/:pid/thumbnail/:idx (개별 이미지)
+- 썸네일 스트립 뷰: 타임라인에 썸네일 나열
+- 프레임 클릭 시 해당 위치 썸네일 표시
+- 라이브 스트림: 주기적 snapshot 캡처
+
+## Phase 17 - 라이브 스트림 입력 (실시간 계측)
+- ingest/udp.rs 본격 구현
+  - UDP 멀티캐스트 수신 (igmp join)
+  - RTP 디캡슐레이션 (RTP header strip → TS 패킷 추출)
+  - SRT 수신 지원 (libsrt FFI 또는 srt-rs)
+- ingest/http.rs: HLS/DASH 폴링 수신
+- 스트림 주소 입력 UI
+  - udp://239.x.x.x:port
+  - rtp://239.x.x.x:port
+  - srt://host:port
+  - http(s)://url (HLS m3u8)
+- API: POST /api/ingest/start (url, protocol)
+- API: POST /api/ingest/stop
+- API: GET /api/ingest/status
+- 실시간 분석 파이프라인: 수신 → 파싱 → 분석 → WebSocket push
+- 대시보드: 실시간 갱신 (비트레이트, PID, CC 에러, PCR 지터 연속 모니터링)
+- 스트림 전환 시 자동 PAT/PMT 재감지
+
+## Phase 18 - TR 101 290 계측 (Priority 1/2/3)
+- Priority 1 (필수 모니터링 - 서비스 불가 수준)
+  - TS sync loss: 연속 sync byte 실패 감지
+  - Sync byte error: 0x47 아닌 바이트
+  - PAT error: PAT 미수신 또는 interval > 500ms
+  - PAT error 2: scrambled PAT
+  - CC error: continuity counter 불연속
+  - PMT error: PMT 미수신 또는 interval 초과
+  - PID error: PID 소실 (있던 PID가 사라짐)
+- Priority 2 (권장 모니터링 - 품질 저하)
+  - Transport error: TEI bit 감지
+  - CRC error: PSI 테이블 CRC32 불일치
+  - PCR error: PCR 미수신 interval > 100ms
+  - PCR accuracy error: PCR 정확도 ±500ns 초과
+  - PCR repetition error: PCR 반복 간격 > 40ms
+  - PTS error: PTS 미수신
+  - CAT error: CAT 오류 (스크램블 스트림 시)
+- Priority 3 (정보성 모니터링)
+  - NIT error: NIT 미수신
+  - NIT actual: NIT 실제 네트워크 interval
+  - SI repetition error: SDT/EIT/TDT 반복 간격
+  - Unreferenced PID: PAT/PMT에 없는 PID 존재
+  - SDT error: SDT 미수신
+  - EIT error: EIT 미수신
+  - RST error: RST 오류
+  - TDT error: TDT 미수신
+- 에러 카운터 대시보드: Priority별 그룹핑
+  - P1: 빨강 배경 경고, 즉시 알림
+  - P2: 노랑 배경 경고
+  - P3: 정보성 파랑 표시
+- 에러 히스토리 타임라인: 시간축 에러 발생 이력
+- 임계값 설정 UI: 각 항목별 경고 임계값 커스터마이즈
+- 에러 로그 CSV/JSON 내보내기
+
+## Phase 19 - CMA-1820 수준 UI 통합
+- 메인 대시보드 재구성: 멀티 패널 레이아웃
+  - 좌측: 스트림 셀렉터 (파일 목록 / 라이브 입력 목록)
+  - 중앙 상단: 오실로스코프 (비트레이트 + PCR 지터 듀얼 축)
+  - 중앙 하단: PID 점유율 스택 바 차트 (실시간 갱신)
+  - 우측 상단: 스트림 요약 패널 (비트레이트, 패킷수, 에러율)
+  - 우측 하단: TR 101 290 에러 요약 (P1/P2/P3 카운터)
+- 탭 기반 상세 뷰
+  - [TRANSPORT] TS 헤더 통계, 패킷 에러율, sync 상태
+  - [PROGRAMS] PSI 트리 (PAT → PMT → ES), SDT 서비스명
+  - [PIDS] PID 테이블 + 점유율 파이 차트
+  - [TIMING] PCR/PTS/DTS 그래프, AV sync, 프레임 간격
+  - [VIDEO] 프레임 타임라인, GOP 구조, SPS/PPS, 썸네일 스트립
+  - [AUDIO] 오디오 프레임 분석, 채널 레이아웃, Dolby 메타데이터
+  - [ERRORS] TR 101 290 전체 계측 대시보드
+  - [HEX] 패킷 HEX 에디터 뷰
+  - [OUTPUT] 송출 제어 및 모니터링
+- 다중 스트림 비교 모드: 2개 스트림 나란히 분석
+- 알람 시스템
+  - 에러 발생 시 화면 깜빡임 + 사운드 알림
+  - 에러 이력 패널 (시간순 정렬, 필터링)
+  - 이메일/웹훅 알림 설정
+- 세션 저장/불러오기: 분석 결과 스냅샷 저장
+- 보고서 생성: PDF/HTML 리포트 (분석 요약, 에러 목록, 차트 포함)
+
+## Phase 20 - 성능 최적화 및 프로덕션
+- Rust 멀티스레드 분석 파이프라인 (rayon 또는 tokio 병렬)
+- 대용량 파일 랜덤 액세스 (mmap 기반)
+- WebSocket 메시지 압축 (MessagePack 또는 CBOR)
+- Dashboard 가상 스크롤 (대량 PID/프레임 목록)
+- 도커 이미지 빌드 (multi-stage)
+- CI/CD: GitHub Actions (cargo test + npm build + docker push)
+- 크로스 컴파일: linux-x86_64, linux-aarch64 (방송 장비 ARM 지원)
