@@ -44,4 +44,6 @@ CREATE INDEX IF NOT EXISTS idx_pid_snapshots_session ON pid_snapshots(session_id
 CREATE INDEX IF NOT EXISTS idx_errors_session ON errors(session_id);
 CREATE INDEX IF NOT EXISTS idx_errors_priority ON errors(priority);
 CREATE INDEX IF NOT EXISTS idx_bitrate_history_session ON bitrate_history(session_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time DESC);
+CREATE INDEX IF NOT EXISTS idx_errors_timestamp ON errors(timestamp_ms);
 "#;

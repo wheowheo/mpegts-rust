@@ -9,7 +9,7 @@ pub mod pid_detail;
 pub mod frame_index;
 pub mod tr101290;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use ts_core::packet::{TsPacket, TS_PACKET_SIZE};
 use ts_core::pid::PidMap;
 use ts_core::psi::{PsiSection, pat::Pat, pmt::Pmt};
@@ -36,8 +36,8 @@ pub struct StreamAnalyzer {
     pub pmts: HashMap<u16, Pmt>,
     pub scte35_events: Vec<Scte35>,
 
-    pmt_pids: Vec<u16>,
-    scte35_pids: Vec<u16>,
+    pmt_pids: HashSet<u16>,
+    scte35_pids: HashSet<u16>,
 
     psi_buffers: HashMap<u16, Vec<u8>>,
     pub pid_details: HashMap<u16, PidDetailCollector>,
@@ -62,8 +62,8 @@ impl StreamAnalyzer {
             pat: None,
             pmts: HashMap::new(),
             scte35_events: Vec::new(),
-            pmt_pids: Vec::new(),
-            scte35_pids: Vec::new(),
+            pmt_pids: HashSet::new(),
+            scte35_pids: HashSet::new(),
             psi_buffers: HashMap::new(),
             pid_details: HashMap::new(),
             pes_assemblers: HashMap::new(),
@@ -198,7 +198,8 @@ impl StreamAnalyzer {
                         .filter(|e| e.program_number != 0)
                         .map(|e| e.pid)
                         .collect();
-                    analyzer.tr101290.set_pmt_pids(&analyzer.pmt_pids);
+                    let pmt_vec: Vec<u16> = analyzer.pmt_pids.iter().copied().collect();
+                    analyzer.tr101290.set_pmt_pids(&pmt_vec);
                     let all_pids: Vec<u16> = pat.entries.iter().map(|e| e.pid).collect();
                     analyzer.tr101290.set_pat_pids(&all_pids);
                     analyzer.pat = Some(pat);
@@ -218,8 +219,8 @@ impl StreamAnalyzer {
 
                     for s in &pmt.streams {
                         // SCTE-35 PID 감지
-                        if s.stream_type == 0x86 && !analyzer.scte35_pids.contains(&s.elementary_pid) {
-                            analyzer.scte35_pids.push(s.elementary_pid);
+                        if s.stream_type == 0x86 {
+                            analyzer.scte35_pids.insert(s.elementary_pid);
                         }
 
                         // PID label/stream_type 업데이트 (엔트리 없으면 생성)
@@ -294,17 +295,19 @@ impl StreamAnalyzer {
             buf.extend_from_slice(payload);
         }
 
-        if let Some(buf) = self.psi_buffers.get(&pid).cloned() {
+        // take buffer to avoid borrow conflict, parse, then put back
+        if let Some(buf) = self.psi_buffers.remove(&pid) {
             if let Ok(section) = PsiSection::parse(&buf) {
                 handler(self, &section);
             }
+            self.psi_buffers.insert(pid, buf);
         }
     }
 
     pub fn sync_pid_bitrates(&mut self) {
         for (pid, info) in &mut self.pid_map.pids {
             if let Some(samples) = self.bitrate_stats.pid_bitrate_samples(*pid) {
-                if let Some(last) = samples.last() {
+                if let Some(last) = samples.back() {
                     info.bitrate_bps = last.bitrate_bps;
                 }
             }

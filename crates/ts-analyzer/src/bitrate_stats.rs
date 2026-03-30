@@ -1,6 +1,8 @@
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use ts_core::timing::PCR_CLOCK_RATE;
+
+const MAX_BITRATE_SAMPLES: usize = 5_000;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct BitrateSample {
@@ -17,8 +19,8 @@ struct PidAccumulator {
 
 #[derive(Debug)]
 pub struct BitrateStats {
-    per_pid: HashMap<u16, Vec<BitrateSample>>,
-    total_samples: Vec<BitrateSample>,
+    per_pid: HashMap<u16, VecDeque<BitrateSample>>,
+    total_samples: VecDeque<BitrateSample>,
     accumulators: HashMap<u16, PidAccumulator>,
     global_packet_count: u64,
     global_last_pcr: Option<u64>,
@@ -30,7 +32,7 @@ impl BitrateStats {
     pub fn new(packet_size: u64) -> Self {
         Self {
             per_pid: HashMap::new(),
-            total_samples: Vec::new(),
+            total_samples: VecDeque::with_capacity(MAX_BITRATE_SAMPLES),
             accumulators: HashMap::new(),
             global_packet_count: 0,
             global_last_pcr: None,
@@ -58,7 +60,10 @@ impl BitrateStats {
                 if duration > 0.0 {
                     let packets = self.global_packet_count - self.global_last_count;
                     let bps = packets as f64 * self.packet_size as f64 * 8.0 / duration;
-                    self.total_samples.push(BitrateSample {
+                    if self.total_samples.len() >= MAX_BITRATE_SAMPLES {
+                        self.total_samples.pop_front();
+                    }
+                    self.total_samples.push_back(BitrateSample {
                         timestamp_sec,
                         bitrate_bps: bps,
                     });
@@ -76,7 +81,11 @@ impl BitrateStats {
                     if duration > 0.0 {
                         let packets = acc.packet_count - acc.last_count_at_pcr;
                         let bps = packets as f64 * self.packet_size as f64 * 8.0 / duration;
-                        self.per_pid.entry(pid).or_default().push(BitrateSample {
+                        let samples = self.per_pid.entry(pid).or_default();
+                        if samples.len() >= MAX_BITRATE_SAMPLES {
+                            samples.pop_front();
+                        }
+                        samples.push_back(BitrateSample {
                             timestamp_sec,
                             bitrate_bps: bps,
                         });
@@ -94,16 +103,16 @@ impl BitrateStats {
         }
     }
 
-    pub fn total_bitrate_samples(&self) -> &[BitrateSample] {
+    pub fn total_bitrate_samples(&self) -> &VecDeque<BitrateSample> {
         &self.total_samples
     }
 
-    pub fn pid_bitrate_samples(&self, pid: u16) -> Option<&[BitrateSample]> {
-        self.per_pid.get(&pid).map(|v| v.as_slice())
+    pub fn pid_bitrate_samples(&self, pid: u16) -> Option<&VecDeque<BitrateSample>> {
+        self.per_pid.get(&pid)
     }
 
     pub fn latest_total_bitrate(&self) -> Option<f64> {
-        self.total_samples.last().map(|s| s.bitrate_bps)
+        self.total_samples.back().map(|s| s.bitrate_bps)
     }
 }
 

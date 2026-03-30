@@ -1,6 +1,9 @@
 use serde::Serialize;
+use std::collections::VecDeque;
 use ts_decoder::{h264, h265, ac3, aac, VideoFrame, AudioFrame, FrameInfo};
 use ts_decoder::thumbnail::ThumbnailExtractor;
+
+const MAX_FRAMES: usize = 50_000;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FrameEntry {
@@ -14,7 +17,7 @@ pub struct FrameEntry {
 }
 
 pub struct FrameIndexer {
-    pub frames: Vec<FrameEntry>,
+    pub frames: VecDeque<FrameEntry>,
     pub thumb_extractor: ThumbnailExtractor,
     stream_type: Option<u8>,
     pes_buffer: Vec<u8>,
@@ -27,7 +30,7 @@ pub struct FrameIndexer {
 impl FrameIndexer {
     pub fn new() -> Self {
         Self {
-            frames: Vec::new(),
+            frames: VecDeque::with_capacity(MAX_FRAMES),
             thumb_extractor: ThumbnailExtractor::new(30), // every 30 I-frames ~1sec@30fps
             stream_type: None,
             pes_buffer: Vec::new(),
@@ -36,6 +39,13 @@ impl FrameIndexer {
             h264_sps: None,
             h265_sps: None,
         }
+    }
+
+    fn push_frame(&mut self, entry: FrameEntry) {
+        if self.frames.len() >= MAX_FRAMES {
+            self.frames.pop_front();
+        }
+        self.frames.push_back(entry);
     }
 
     pub fn set_stream_type(&mut self, st: u8) {
@@ -87,7 +97,7 @@ impl FrameIndexer {
                         }
                     }
 
-                    self.frames.push(FrameEntry {
+                    self.push_frame(FrameEntry {
                         index: idx,
                         packet_index,
                         frame_type: slice.slice_type_name.clone(),
@@ -130,7 +140,7 @@ impl FrameIndexer {
                         .map(|s| format!("{:.1}", s.level_idc as f32 / 30.0));
 
                     let idx = self.frames.len();
-                    self.frames.push(FrameEntry {
+                    self.push_frame(FrameEntry {
                         index: idx,
                         packet_index,
                         frame_type: slice.slice_type_name.clone(),
@@ -157,7 +167,7 @@ impl FrameIndexer {
     fn index_ac3(&mut self, packet_index: u64) {
         if let Some(frame) = ac3::parse_frame(&self.pes_buffer) {
             let idx = self.frames.len();
-            self.frames.push(FrameEntry {
+            self.push_frame(FrameEntry {
                 index: idx,
                 packet_index,
                 frame_type: "Audio".into(),
@@ -185,7 +195,7 @@ impl FrameIndexer {
                 (frame.frame_length as u32 * 8 * frame.sample_rate / 1024 / 1000) as u32
             } else { 0 };
             let idx = self.frames.len();
-            self.frames.push(FrameEntry {
+            self.push_frame(FrameEntry {
                 index: idx,
                 packet_index,
                 frame_type: "Audio".into(),

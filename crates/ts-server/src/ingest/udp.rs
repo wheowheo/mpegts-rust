@@ -26,6 +26,7 @@ pub async fn start_udp_ingest(
     tracing::info!("UDP ingest started on port {} (rtp={})", port, rtp);
 
     let mut buf = [0u8; UDP_BUF_SIZE];
+    let mut packet_count = 0u64;
 
     loop {
         tokio::select! {
@@ -37,26 +38,37 @@ pub async fn start_udp_ingest(
                     &buf[..len]
                 };
 
+                // collect packet offsets first without lock
+                let mut offsets = Vec::new();
                 let mut offset = 0;
-                let mut analyzer = state.analyzer.write().await;
-
                 while offset + TS_PACKET_SIZE <= data.len() {
                     if data[offset] == 0x47 {
-                        analyzer.feed_packet(&data[offset..offset + TS_PACKET_SIZE]);
+                        offsets.push(offset);
                         offset += TS_PACKET_SIZE;
                     } else {
                         offset += 1;
                     }
                 }
 
-                if analyzer.total_packets() % 500 == 0 {
-                    analyzer.sync_pid_bitrates();
-                    if let Ok(json) = serde_json::to_string(&serde_json::json!({
-                        "total_bitrate_bps": analyzer.bitrate_stats.latest_total_bitrate(),
-                        "pcr_jitter_ms": analyzer.pcr_jitter.average_jitter_ms(),
-                        "total_packets": analyzer.total_packets(),
-                    })) {
-                        let _ = state.ws_tx.send(json);
+                // acquire lock only for feeding packets
+                if !offsets.is_empty() {
+                    let mut analyzer = state.analyzer.write().await;
+                    for &off in &offsets {
+                        analyzer.feed_packet(&data[off..off + TS_PACKET_SIZE]);
+                    }
+                    packet_count += offsets.len() as u64;
+
+                    if packet_count % 500 == 0 {
+                        analyzer.sync_pid_bitrates();
+                        let json_data = serde_json::json!({
+                            "total_bitrate_bps": analyzer.bitrate_stats.latest_total_bitrate(),
+                            "pcr_jitter_ms": analyzer.pcr_jitter.average_jitter_ms(),
+                            "total_packets": analyzer.total_packets(),
+                        });
+                        drop(analyzer); // release lock before send
+                        if let Ok(json) = serde_json::to_string(&json_data) {
+                            let _ = state.ws_tx.send(json);
+                        }
                     }
                 }
             }
