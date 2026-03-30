@@ -34,7 +34,8 @@ async fn main() {
         .route("/stream", get(api::stream::get_stream_info))
         .route("/pids", get(api::pid::get_pid_map))
         .route("/pids/{pid}", get(api::pid::get_pid_detail))
-        .route("/analyze", post(api::analyze::start_analysis))
+        .route("/analyze", post(api::analyze::start_analysis)
+            .layer(DefaultBodyLimit::max(4 * 1024 * 1024 * 1024)))
         .route("/output/start", post(api::output::start_output))
         .route("/output/stop", post(api::output::stop_all_outputs))
         .route("/output/stop/{session_id}", post(api::output::stop_output))
@@ -46,7 +47,7 @@ async fn main() {
         .nest("/api", api_routes)
         .route("/ws", get(ws::realtime::ws_handler))
         .fallback_service(ServeDir::new("dashboard/build"))
-        .layer(DefaultBodyLimit::max(2 * 1024 * 1024 * 1024)) // 2GB
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024)) // 10MB default
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state);
