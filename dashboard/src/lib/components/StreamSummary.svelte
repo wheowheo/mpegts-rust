@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { StreamInfo } from '../types';
+	import type { StreamInfo, PidInfo } from '../types';
 
-	let { info }: { info: StreamInfo | null } = $props();
+	let { info, pids = [] }: { info: StreamInfo | null; pids?: PidInfo[] } = $props();
 
 	function formatBitrate(bps: number): string {
 		if (bps >= 1_000_000) return (bps / 1_000_000).toFixed(2);
@@ -29,9 +29,10 @@
 		return Math.min((bps / 50_000_000) * 100, 100);
 	}
 
-	const totalCcErrors = $derived(
-		info ? 0 : 0  // placeholder, actual from pids
-	);
+	const nullPid = $derived(pids.find(p => p.pid === 0x1FFF));
+	const nullPct = $derived(nullPid ? nullPid.percentage : 0);
+	const nullCount = $derived(nullPid ? nullPid.packet_count : 0);
+	const totalCcErrors = $derived(pids.reduce((sum, p) => sum + p.cc_errors, 0));
 </script>
 
 {#if info}
@@ -64,6 +65,39 @@
 	</div>
 
 	<div class="card meter">
+		<h3>Null Ratio</h3>
+		<div class="meter-value">
+			<span class="seg-number" class:green={nullPct < 5} class:amber={nullPct >= 5 && nullPct < 30} class:red={nullPct >= 30}>
+				{nullPct.toFixed(1)}
+			</span>
+			<span class="meter-unit">%</span>
+		</div>
+		<div class="meter-bar">
+			<div class="meter-fill" style="width: {nullPct}%; background: {nullPct >= 30 ? 'var(--red)' : nullPct >= 5 ? 'var(--amber)' : 'var(--green)'};"></div>
+		</div>
+		<div class="meter-sub">
+			{#if nullCount > 0}
+				{nullCount.toLocaleString()} null pkts
+			{:else}
+				No null packets
+			{/if}
+		</div>
+	</div>
+
+	<div class="card meter">
+		<h3>CC Errors</h3>
+		<div class="meter-value">
+			<span class="seg-number" class:green={totalCcErrors === 0} class:red={totalCcErrors > 0}>
+				{totalCcErrors.toLocaleString()}
+			</span>
+		</div>
+		<div class="meter-sub">
+			<span class="led" class:led-green={totalCcErrors === 0} class:led-red={totalCcErrors > 0}></span>
+			{totalCcErrors === 0 ? 'CLEAN' : 'ERRORS'}
+		</div>
+	</div>
+
+	<div class="card meter">
 		<h3>Programs</h3>
 		<div class="meter-value">
 			<span class="seg-number cyan">{info.programs.length}</span>
@@ -89,7 +123,7 @@
 <style>
 	.meter-grid {
 		display: grid;
-		grid-template-columns: 1.5fr 1fr 1fr 0.8fr 1.5fr;
+		grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 0.8fr 1.5fr;
 		gap: 0.5rem;
 	}
 	.meter {
@@ -113,6 +147,9 @@
 		font-family: var(--font-mono);
 		font-size: 0.65rem;
 		color: var(--text-dim);
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
 	}
 	.file-meter { justify-content: center; }
 	.filename {
@@ -138,8 +175,11 @@
 		padding: 1rem;
 	}
 
-	@media (max-width: 900px) {
-		.meter-grid { grid-template-columns: repeat(2, 1fr); }
+	@media (max-width: 1100px) {
+		.meter-grid { grid-template-columns: repeat(4, 1fr); }
 		.file-meter { grid-column: 1 / -1; }
+	}
+	@media (max-width: 700px) {
+		.meter-grid { grid-template-columns: repeat(2, 1fr); }
 	}
 </style>

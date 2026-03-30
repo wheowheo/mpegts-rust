@@ -110,7 +110,7 @@
 	</div>
 
 	{#if store.streamInfo}
-		<StreamSummary info={store.streamInfo} />
+		<StreamSummary info={store.streamInfo} pids={store.pids} />
 
 		<div class="scope-row">
 			<BitrateChart data={store.bitrateHistory} />
