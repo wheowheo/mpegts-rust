@@ -74,3 +74,10 @@
 - TxBitrateChart.svelte: 목표 vs 실제 비트레이트 차트
 - SystemLoad.svelte: CPU/메모리 게이지, 여유 스트림 수 표시
 - /output 라우트 추가, 네비게이션 연결
+
+## Phase 11 - 다중 스트림 및 안정화
+- OutputSessionManager: 세션 ID 기반 다중 송출 동시 관리
+- 세션별 독립 start/stop/status
+- API 확장: POST start, POST stop/{id}, POST stop (all), GET list, GET {id}
+- 자동 경고: 비트레이트 이탈 5% warning, 15% critical
+- Dashboard: 다중 세션 목록, 세션별 경고 표시, 전체 요약 카드

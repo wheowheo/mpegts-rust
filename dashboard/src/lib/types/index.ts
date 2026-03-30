@@ -45,6 +45,7 @@ export interface RealtimeData {
 }
 
 export interface OutputConfig {
+	session_id?: string;
 	source_type: 'file' | 'udp';
 	source_path?: string;
 	source_addr?: string;
@@ -54,13 +55,21 @@ export interface OutputConfig {
 	bitrate_bps: number;
 }
 
+export interface Alert {
+	level: 'warning' | 'critical';
+	message: string;
+	timestamp_sec: number;
+}
+
 export interface OutputStatus {
+	session_id: string;
 	running: boolean;
 	config: OutputConfig | null;
 	packets_sent: number;
 	bytes_sent: number;
 	elapsed_sec: number;
 	actual_bitrate_bps: number;
+	alerts: Alert[];
 }
 
 export interface SystemSnapshot {

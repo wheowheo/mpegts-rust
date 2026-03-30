@@ -15,23 +15,23 @@ pub async fn get_system_stats(
     let mut collector = state.system_stats.write().await;
     let sys = collector.snapshot();
 
-    let output = state.output_session.read().await;
-    let output_status = output.status.read().await;
-
-    let (bitrate, stream_count) = if output_status.running {
-        (
-            output_status.config.as_ref().map(|c| c.bitrate_bps).unwrap_or(0),
-            1u32,
-        )
+    let manager = state.output_manager.read().await;
+    let sessions = manager.list_all().await;
+    let stream_count = sessions.iter().filter(|s| s.running).count() as u32;
+    let avg_bitrate = if stream_count > 0 {
+        sessions.iter()
+            .filter(|s| s.running)
+            .filter_map(|s| s.config.as_ref().map(|c| c.bitrate_bps))
+            .sum::<u64>() / stream_count as u64
     } else {
-        (0, 0)
+        0
     };
 
     let cap = capacity::estimate_capacity(
         &sys,
-        bitrate,
+        avg_bitrate,
         stream_count,
-        1_000_000_000, // 1 Gbps default
+        1_000_000_000,
     );
 
     Json(SystemResponse {

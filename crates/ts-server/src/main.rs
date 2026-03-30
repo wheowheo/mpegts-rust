@@ -26,7 +26,7 @@ async fn main() {
     let state = Arc::new(AppState {
         analyzer: RwLock::new(ts_analyzer::StreamAnalyzer::new()),
         ws_tx: tx,
-        output_session: RwLock::new(output::session::OutputSession::new()),
+        output_manager: RwLock::new(output::session::OutputSessionManager::new()),
         system_stats: RwLock::new(ts_analyzer::system_stats::SystemStatsCollector::new()),
     });
 
@@ -36,8 +36,10 @@ async fn main() {
         .route("/pids/{pid}", get(api::pid::get_pid_detail))
         .route("/analyze", post(api::analyze::start_analysis))
         .route("/output/start", post(api::output::start_output))
-        .route("/output/stop", post(api::output::stop_output))
-        .route("/output/status", get(api::output::get_output_status))
+        .route("/output/stop", post(api::output::stop_all_outputs))
+        .route("/output/stop/{session_id}", post(api::output::stop_output))
+        .route("/output/list", get(api::output::list_outputs))
+        .route("/output/{session_id}", get(api::output::get_output_status))
         .route("/system", get(api::system::get_system_stats));
 
     let app = Router::new()

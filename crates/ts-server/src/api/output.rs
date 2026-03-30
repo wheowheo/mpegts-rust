@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     Json,
 };
@@ -12,28 +12,44 @@ pub async fn start_output(
     Json(config): Json<OutputConfig>,
 ) -> Result<Json<OutputStatus>, (StatusCode, String)> {
     let ws_tx = state.ws_tx.clone();
-    let mut session = state.output_session.write().await;
+    let mut manager = state.output_manager.write().await;
 
-    session.start(config, ws_tx).await
+    let status = manager.start(config, ws_tx).await
         .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
 
-    let status = session.status.read().await.clone();
     Ok(Json(status))
 }
 
 pub async fn stop_output(
     State(state): State<Arc<AppState>>,
-) -> Json<OutputStatus> {
-    let mut session = state.output_session.write().await;
-    session.stop().await;
-    let status = session.status.read().await.clone();
-    Json(status)
+    Path(session_id): Path<String>,
+) -> Json<serde_json::Value> {
+    let mut manager = state.output_manager.write().await;
+    manager.stop(&session_id).await;
+    Json(serde_json::json!({ "stopped": session_id }))
+}
+
+pub async fn stop_all_outputs(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let mut manager = state.output_manager.write().await;
+    manager.stop_all().await;
+    Json(serde_json::json!({ "stopped": "all" }))
 }
 
 pub async fn get_output_status(
     State(state): State<Arc<AppState>>,
-) -> Json<OutputStatus> {
-    let session = state.output_session.read().await;
-    let status = session.status.read().await.clone();
-    Json(status)
+    Path(session_id): Path<String>,
+) -> Result<Json<OutputStatus>, StatusCode> {
+    let manager = state.output_manager.read().await;
+    manager.get_status(&session_id).await
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
+}
+
+pub async fn list_outputs(
+    State(state): State<Arc<AppState>>,
+) -> Json<Vec<OutputStatus>> {
+    let manager = state.output_manager.read().await;
+    Json(manager.list_all().await)
 }

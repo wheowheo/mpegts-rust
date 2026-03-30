@@ -36,13 +36,15 @@ export async function startOutput(config: OutputConfig): Promise<OutputStatus> {
 	return res.json();
 }
 
-export async function stopOutput(): Promise<OutputStatus> {
-	const res = await fetch(`${BASE}/output/stop`, { method: 'POST' });
-	return res.json();
+export async function stopOutput(sessionId?: string): Promise<void> {
+	const url = sessionId
+		? `${BASE}/output/stop/${sessionId}`
+		: `${BASE}/output/stop`;
+	await fetch(url, { method: 'POST' });
 }
 
-export async function fetchOutputStatus(): Promise<OutputStatus> {
-	const res = await fetch(`${BASE}/output/status`);
+export async function listOutputs(): Promise<OutputStatus[]> {
+	const res = await fetch(`${BASE}/output/list`);
 	return res.json();
 }
 
