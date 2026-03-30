@@ -154,6 +154,45 @@ export async function fetchTr101290(): Promise<Tr101290Summary> {
 	return res.json();
 }
 
+export interface SessionRecord {
+	id: string;
+	filename: string;
+	start_time: string;
+	end_time: string | null;
+	duration_ms: number | null;
+	total_packets: number;
+	bitrate_bps: number;
+	p1_errors: number;
+	p2_errors: number;
+	p3_errors: number;
+}
+
+export interface HistoryStats {
+	total_sessions: number;
+	total_errors: number;
+	total_packets: number;
+}
+
+export async function fetchHistorySessions(limit = 50, offset = 0): Promise<SessionRecord[]> {
+	const res = await fetch(`${BASE}/history/sessions?limit=${limit}&offset=${offset}`);
+	return res.json();
+}
+
+export async function fetchHistorySession(id: string): Promise<any> {
+	const res = await fetch(`${BASE}/history/sessions/${id}`);
+	if (!res.ok) throw new Error('Session not found');
+	return res.json();
+}
+
+export async function deleteHistorySession(id: string): Promise<void> {
+	await fetch(`${BASE}/history/sessions/${id}`, { method: 'DELETE' });
+}
+
+export async function fetchHistoryStats(): Promise<HistoryStats> {
+	const res = await fetch(`${BASE}/history/stats`);
+	return res.json();
+}
+
 export async function fetchTr101290Errors(limit = 200, priority?: string): Promise<Tr101290Error[]> {
 	const params = new URLSearchParams({ limit: String(limit) });
 	if (priority) params.set('priority', priority);

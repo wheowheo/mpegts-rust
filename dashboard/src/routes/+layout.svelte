@@ -40,6 +40,7 @@
 				<a href="/output">OUTPUT</a>
 				<a href="/scte35">SCTE-35</a>
 				<a href="/errors">TR 101 290</a>
+				<a href="/history">HISTORY</a>
 			</nav>
 			<div class="status-group">
 				<div class="status-item">

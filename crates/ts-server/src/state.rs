@@ -1,6 +1,8 @@
 use serde::Serialize;
+use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock, watch};
 use crate::output::session::OutputSessionManager;
+use crate::db::Database;
 use ts_analyzer::system_stats::SystemStatsCollector;
 
 #[derive(Debug, Clone, Serialize)]
@@ -23,4 +25,6 @@ pub struct AppState {
     pub output_manager: RwLock<OutputSessionManager>,
     pub system_stats: RwLock<SystemStatsCollector>,
     pub ingest: RwLock<Option<IngestSession>>,
+    pub db: Arc<Database>,
+    pub current_session_id: RwLock<Option<String>>,
 }

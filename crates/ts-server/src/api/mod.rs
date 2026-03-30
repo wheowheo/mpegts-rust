@@ -5,3 +5,4 @@ pub mod output;
 pub mod system;
 pub mod ingest;
 pub mod tr101290;
+pub mod history;

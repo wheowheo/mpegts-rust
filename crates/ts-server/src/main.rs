@@ -1,4 +1,4 @@
-use axum::{extract::DefaultBodyLimit, routing::{get, post}, Router};
+use axum::{extract::DefaultBodyLimit, routing::{delete, get, post}, Router};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
@@ -9,6 +9,7 @@ mod ws;
 mod ingest;
 mod output;
 mod state;
+pub mod db;
 
 use state::AppState;
 
@@ -21,6 +22,10 @@ async fn main() {
         )
         .init();
 
+    let db_path = std::path::Path::new("data/ts-engine.db");
+    let database = Arc::new(db::Database::open(db_path).expect("failed to open database"));
+    database.cleanup_old(30).ok();
+
     let (tx, _) = broadcast::channel::<String>(256);
 
     let state = Arc::new(AppState {
@@ -29,6 +34,8 @@ async fn main() {
         output_manager: RwLock::new(output::session::OutputSessionManager::new()),
         system_stats: RwLock::new(ts_analyzer::system_stats::SystemStatsCollector::new()),
         ingest: RwLock::new(None),
+        db: database,
+        current_session_id: RwLock::new(None),
     });
 
     let api_routes = Router::new()
@@ -53,7 +60,13 @@ async fn main() {
         .route("/tr101290/errors", get(api::tr101290::get_tr101290_errors))
         .route("/ingest/start", post(api::ingest::start_ingest))
         .route("/ingest/stop", post(api::ingest::stop_ingest))
-        .route("/ingest/status", get(api::ingest::get_ingest_status));
+        .route("/ingest/status", get(api::ingest::get_ingest_status))
+        .route("/history/sessions", get(api::history::list_sessions))
+        .route("/history/sessions/{id}", get(api::history::get_session))
+        .route("/history/sessions/{id}", delete(api::history::delete_session))
+        .route("/history/sessions/{id}/bitrate", get(api::history::get_session_bitrate))
+        .route("/history/sessions/{id}/errors", get(api::history::get_session_errors))
+        .route("/history/stats", get(api::history::get_stats));
 
     let app = Router::new()
         .nest("/api", api_routes)

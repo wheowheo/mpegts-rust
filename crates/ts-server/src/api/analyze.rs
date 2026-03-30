@@ -82,8 +82,50 @@ pub async fn start_analysis(
 
     analyzer.sync_pid_bitrates();
 
-    // 최종 결과 전송
+    // save session to DB
+    let session_id = uuid::Uuid::new_v4().to_string();
+    if let Err(e) = state.db.create_session(&session_id, &filename) {
+        tracing::warn!("failed to create session: {}", e);
+    }
+
     let total_packets = analyzer.total_packets();
+    let tr_summary = analyzer.tr101290.summary();
+    let bitrate = analyzer.bitrate_calc.bitrate_bps().unwrap_or(0.0);
+    let duration_ms = analyzer.duration_ms();
+
+    // save PID snapshots
+    for info in analyzer.pid_map.pids.values() {
+        state.db.save_pid_snapshot(
+            &session_id, info.pid, &info.label, info.stream_type,
+            info.packet_count, info.cc_errors, info.bitrate_bps,
+        ).ok();
+    }
+
+    // save TR 101 290 errors (limit 1000)
+    for err in tr_summary.errors.iter().take(1000) {
+        let prio = match err.priority {
+            ts_analyzer::tr101290::Priority::P1 => "P1",
+            ts_analyzer::tr101290::Priority::P2 => "P2",
+            ts_analyzer::tr101290::Priority::P3 => "P3",
+        };
+        state.db.save_error(
+            &session_id, err.timestamp_ms, &err.error_type, prio,
+            err.pid, Some(&err.description),
+        ).ok();
+    }
+
+    // finish session
+    state.db.finish_session(
+        &session_id, total_packets, bitrate, duration_ms,
+        tr_summary.p1_count, tr_summary.p2_count, tr_summary.p3_count,
+    ).ok();
+
+    {
+        let mut sid = state.current_session_id.write().await;
+        *sid = Some(session_id);
+    }
+
+    // 최종 결과 전송
     {
         let mut stored = state.analyzer.write().await;
         *stored = analyzer;
