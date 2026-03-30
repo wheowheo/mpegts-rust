@@ -17,7 +17,7 @@ MPEG-TS Engine + Dashboard: Rust 백엔드(ts-core, ts-analyzer, ts-server) + Sv
 - 각 페이즈 완료 시 HISTORY.md에 기록한다
 - 불필요한 주석, docstring을 남발하지 않는다
 - 과도한 에러 핸들링이나 추상화를 하지 않는다
-- ffmpeg 등 외부 도구를 Command CLI로 호출하지 않는다. 반드시 FFI/바인딩(libav*, ffmpeg-sys 등)을 사용한다
+- 외부 라이브러리 연동 시 절대 바이너리 호출(Command, subprocess, exec) 방식을 사용하지 않는다. 반드시 FFI, 바인딩 크레이트, 또는 네이티브 Rust 구현을 사용한다
 
 ## 빌드 & 테스트
 - `cargo build` / `cargo test` (Rust)
