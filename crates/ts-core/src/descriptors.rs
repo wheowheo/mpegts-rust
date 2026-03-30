@@ -154,6 +154,9 @@ pub fn descriptor_tag_name(tag: u8) -> &'static str {
         0xA1 => "service_location (ATSC)",
         0xA2 => "time_shifted_service (ATSC)",
         0xA3 => "component_name (ATSC)",
+        0xA6 => "AC-4",
+        0xB0 => "Dolby_Vision_video_stream",
+        0xB1 => "Dolby_Vision_timing",
         0xCC => "E-AC-3_audio_stream (ATSC)",
         _ => "private/unknown",
     }
@@ -191,6 +194,9 @@ pub fn parse_descriptor_detail(desc: &Descriptor) -> ParsedDescriptor {
         0x7C => parse_aac_desc(&desc.data),
         0x81 => parse_atsc_ac3_desc(&desc.data),
         0x86 => parse_caption_service_desc(&desc.data),
+        0xA6 => parse_ac4_desc(&desc.data),
+        0xB0 => parse_dolby_vision_desc(&desc.data),
+        0xCC => parse_atsc_eac3_desc(&desc.data),
         _ => vec![],
     };
 
@@ -426,9 +432,40 @@ fn parse_ac3_desc(d: &[u8]) -> Vec<(String, String)> {
 fn parse_eac3_desc(d: &[u8]) -> Vec<(String, String)> {
     if d.is_empty() { return vec![]; }
     let mut f = vec![];
-    f.push(("component_type_flag".into(), format!("{}", (d[0] >> 7) & 1)));
-    f.push(("bsid_flag".into(), format!("{}", (d[0] >> 6) & 1)));
-    if d.len() > 1 && d[0] & 0x80 != 0 { f.push(("component_type".into(), format!("0x{:02X}", d[1]))); }
+    let comp_type_flag = (d[0] >> 7) & 1;
+    let bsid_flag = (d[0] >> 6) & 1;
+    let mainid_flag = (d[0] >> 5) & 1;
+    let _asvc_flag = (d[0] >> 4) & 1;
+    let _mixinfo_exists = (d[0] >> 3) & 1;
+    let _substream1_flag = (d[0] >> 2) & 1;
+    let _substream2_flag = (d[0] >> 1) & 1;
+    let _substream3_flag = d[0] & 1;
+    f.push(("component_type_flag".into(), format!("{}", comp_type_flag)));
+    f.push(("bsid_flag".into(), format!("{}", bsid_flag)));
+
+    let mut i = 1;
+    if comp_type_flag == 1 && i < d.len() {
+        let comp = d[i];
+        // bit 0 of component_type = JOC flag (Atmos)
+        let joc = comp & 0x01;
+        let full_svc = (comp >> 2) & 1;
+        let svc_type = (comp >> 3) & 0x07;
+        let num_chan = (comp >> 6) & 0x03;
+        f.push(("component_type".into(), format!("0x{:02X}", comp)));
+        f.push(("full_service".into(), format!("{}", full_svc)));
+        f.push(("service_type".into(), format!("{}", svc_type)));
+        f.push(("number_of_channels".into(), format!("{}", num_chan)));
+        f.push(("joc_flag (Atmos)".into(), format!("{} ({})", joc,
+            if joc == 1 { "Dolby Atmos enabled" } else { "No Atmos" })));
+        if joc == 1 {
+            f.push(("codec".into(), "Dolby Atmos (E-AC-3 JOC)".into()));
+        } else {
+            f.push(("codec".into(), "Dolby Digital Plus (E-AC-3)".into()));
+        }
+        i += 1;
+    }
+    if bsid_flag == 1 && i < d.len() { f.push(("bsid".into(), format!("{}", d[i]))); i += 1; }
+    if mainid_flag == 1 && i < d.len() { f.push(("mainid".into(), format!("{}", d[i]))); }
     f
 }
 
@@ -487,5 +524,119 @@ fn parse_caption_service_desc(d: &[u8]) -> Vec<(String, String)> {
         f.push((format!("service_number[{}]", idx), format!("{}", svc_num)));
         i += 6;
     }
+    f
+}
+
+fn parse_ac4_desc(d: &[u8]) -> Vec<(String, String)> {
+    if d.is_empty() { return vec![]; }
+    let mut f = vec![];
+    let ac4_config_state = (d[0] >> 7) & 1;
+    let ac4_toc_flag = (d[0] >> 6) & 1;
+    f.push(("ac4_config_state".into(), format!("{}", ac4_config_state)));
+    f.push(("ac4_toc_flag".into(), format!("{}", ac4_toc_flag)));
+    if d.len() >= 2 {
+        let bitrate_code = d[0] & 0x3F;
+        f.push(("bitrate_indication".into(), format!("0x{:02X}", bitrate_code)));
+    }
+    if d.len() >= 3 {
+        let fs_idx = (d[1] >> 5) & 0x07;
+        let fs = match fs_idx { 0 => "44.1 kHz", 1 => "48 kHz", 2 => "96 kHz", 3 => "192 kHz", _ => "reserved" };
+        f.push(("sampling_frequency".into(), format!("{} ({})", fs_idx, fs)));
+        let frame_len_idx = (d[1] >> 2) & 0x07;
+        f.push(("frame_length_index".into(), format!("{}", frame_len_idx)));
+    }
+    f.push(("codec".into(), "Dolby AC-4".into()));
+    f
+}
+
+fn parse_dolby_vision_desc(d: &[u8]) -> Vec<(String, String)> {
+    if d.len() < 5 { return vec![]; }
+    let mut f = vec![];
+    let dv_version_major = d[0];
+    let dv_version_minor = d[1];
+    let profile = (d[2] >> 1) & 0x7F;
+    let level = ((d[2] & 0x01) << 5) | ((d[3] >> 3) & 0x1F);
+    let rpu_present = (d[3] >> 2) & 1;
+    let el_present = (d[3] >> 1) & 1;
+    let bl_present = d[3] & 1;
+
+    let profile_name = match profile {
+        0 => "dvhe.04 (HDR10 compatible)",
+        1 => "dvhe.05 (HDR10 compatible)",
+        2 => "dvhe.07 (HLG compatible)",
+        3 => "dvhe.08 (SDR compatible)",
+        4 => "dvav.09 (AVC-based)",
+        5 => "dvhe.05 (HEVC cross-compatible)",
+        7 => "dvhe.07 (IPT tunneling)",
+        8 => "dvhe.08 (HEVC dual layer)",
+        9 => "dvav.09 (AVC dual layer)",
+        _ => "unknown",
+    };
+
+    f.push(("dv_version".into(), format!("{}.{}", dv_version_major, dv_version_minor)));
+    f.push(("dv_profile".into(), format!("{} ({})", profile, profile_name)));
+    f.push(("dv_level".into(), format!("{}", level)));
+    f.push(("rpu_present".into(), format!("{}", rpu_present)));
+    f.push(("el_present".into(), format!("{} ({})", el_present, if el_present == 1 { "Enhancement Layer" } else { "No EL" })));
+    f.push(("bl_present".into(), format!("{} ({})", bl_present, if bl_present == 1 { "Base Layer" } else { "No BL" })));
+
+    if d.len() >= 6 {
+        let bl_signal_compatibility_id = (d[4] >> 4) & 0x0F;
+        let compat = match bl_signal_compatibility_id {
+            0 => "not compatible",
+            1 => "HDR10 compatible",
+            2 => "SDR compatible",
+            4 => "HLG compatible",
+            6 => "HDR10+ compatible",
+            _ => "reserved",
+        };
+        f.push(("bl_signal_compatibility".into(), format!("{} ({})", bl_signal_compatibility_id, compat)));
+    }
+
+    f.push(("codec".into(), "Dolby Vision".into()));
+    f
+}
+
+fn parse_atsc_eac3_desc(d: &[u8]) -> Vec<(String, String)> {
+    // ATSC A/52 E-AC-3 audio stream descriptor (tag 0xCC)
+    if d.len() < 3 { return vec![]; }
+    let mut f = vec![];
+    let num_ind_sub = (d[0] >> 4) & 0x07;
+    f.push(("num_independent_sub".into(), format!("{}", num_ind_sub + 1)));
+
+    let fscod = (d[0] >> 2) & 0x03;
+    let fs = match fscod { 0 => "48 kHz", 1 => "44.1 kHz", 2 => "32 kHz", _ => "reserved" };
+    f.push(("sampling_frequency".into(), format!("{} ({})", fscod, fs)));
+
+    let bsid = ((d[0] & 0x03) << 3) | ((d[1] >> 5) & 0x07);
+    f.push(("bsid".into(), format!("{}", bsid)));
+
+    let bsmod = (d[1] >> 2) & 0x07;
+    f.push(("bsmod".into(), format!("{}", bsmod)));
+
+    let acmod = ((d[1] & 0x03) << 1) | ((d[2] >> 7) & 0x01);
+    let ch = match acmod {
+        0 => "1+1 (dual mono)", 1 => "1/0 (C)", 2 => "2/0 (L,R)",
+        3 => "3/0 (L,C,R)", 4 => "2/1 (L,R,S)", 5 => "3/1 (L,C,R,S)",
+        6 => "2/2 (L,R,SL,SR)", 7 => "3/2 (L,C,R,SL,SR)",
+        _ => "unknown",
+    };
+    f.push(("acmod".into(), format!("{} ({})", acmod, ch)));
+
+    let lfeon = (d[2] >> 6) & 0x01;
+    f.push(("lfeon".into(), format!("{} ({})", lfeon, if lfeon == 1 { "LFE on" } else { "LFE off" })));
+
+    // JOC (Joint Object Coding) = Dolby Atmos
+    if d.len() >= 4 {
+        let joc_flag = d[2] & 0x01;
+        f.push(("joc_flag (Atmos)".into(), format!("{} ({})", joc_flag,
+            if joc_flag == 1 { "Dolby Atmos enabled" } else { "No Atmos" })));
+        if joc_flag == 1 {
+            f.push(("codec".into(), "Dolby Atmos (E-AC-3 JOC)".into()));
+        } else {
+            f.push(("codec".into(), "Dolby Digital Plus (E-AC-3)".into()));
+        }
+    }
+
     f
 }

@@ -179,7 +179,12 @@ impl StreamAnalyzer {
                                 scrambled: false,
                             });
                         info.stream_type = Some(s.stream_type);
-                        info.label = Pmt::stream_type_name(s.stream_type).to_string();
+                        let codec = Pmt::codec_name(s.stream_type, &s.descriptors);
+                        if !codec.is_empty() {
+                            info.label = codec.to_string();
+                        } else {
+                            info.label = Pmt::stream_type_name(s.stream_type).to_string();
+                        }
 
                         // store descriptors for this PID
                         if !s.descriptors.is_empty() {

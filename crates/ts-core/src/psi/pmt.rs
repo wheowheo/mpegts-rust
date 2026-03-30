@@ -78,12 +78,54 @@ impl Pmt {
             0x0F => "AAC Audio",
             0x10 => "MPEG-4 Video",
             0x11 => "AAC LATM Audio",
+            0x15 => "Metadata",
             0x1B => "H.264/AVC",
             0x24 => "H.265/HEVC",
             0x81 => "AC-3 Audio",
+            0x82 => "DTS Audio",
+            0x83 => "Dolby TrueHD",
+            0x84 => "Dolby Digital Plus (secondary)",
+            0x85 => "DTS-HD Audio",
             0x86 => "SCTE-35",
             0x87 => "E-AC-3 Audio",
+            0xA1 => "E-AC-3 Audio (secondary)",
+            0xA2 => "DTS-HD Audio (secondary)",
             _ => "Unknown",
+        }
+    }
+
+    pub fn codec_name(stream_type: u8, descriptors: &[u8]) -> &'static str {
+        let descs = crate::descriptors::parse_descriptors(descriptors);
+        for d in &descs {
+            match d.tag {
+                // Dolby Vision via registration descriptor "DOVI"
+                0x05 if d.data.len() >= 4 && &d.data[0..4] == b"DOVI" => return "Dolby Vision",
+                // AC-4 descriptor
+                0xA6 => return "Dolby AC-4",
+                // Enhanced AC-3 with JOC (Atmos)
+                0x7A if !d.data.is_empty() && d.data[0] & 0x01 != 0 => return "Dolby Atmos (E-AC-3 JOC)",
+                0xCC if d.data.len() >= 2 && d.data[1] & 0x01 != 0 => return "Dolby Atmos (E-AC-3 JOC)",
+                // Standard AC-3 / E-AC-3
+                0x6A | 0x81 => return "Dolby Digital (AC-3)",
+                0x7A | 0xCC => return "Dolby Digital Plus (E-AC-3)",
+                // DTS
+                0x7B => return "DTS",
+                // AAC
+                0x7C => return "AAC",
+                _ => {}
+            }
+        }
+        match stream_type {
+            0x81 => "AC-3",
+            0x87 => "E-AC-3",
+            0x83 => "Dolby TrueHD",
+            0x1B => "H.264",
+            0x24 => "H.265",
+            0x01 | 0x02 => "MPEG Video",
+            0x03 | 0x04 => "MPEG Audio",
+            0x0F => "AAC",
+            0x11 => "AAC-LATM",
+            _ => "",
         }
     }
 }
