@@ -7,6 +7,7 @@ use tracing_subscriber::EnvFilter;
 mod api;
 mod ws;
 mod ingest;
+mod output;
 mod state;
 
 use state::AppState;
@@ -25,13 +26,17 @@ async fn main() {
     let state = Arc::new(AppState {
         analyzer: RwLock::new(ts_analyzer::StreamAnalyzer::new()),
         ws_tx: tx,
+        output_session: RwLock::new(output::session::OutputSession::new()),
     });
 
     let api_routes = Router::new()
         .route("/stream", get(api::stream::get_stream_info))
         .route("/pids", get(api::pid::get_pid_map))
         .route("/pids/{pid}", get(api::pid::get_pid_detail))
-        .route("/analyze", post(api::analyze::start_analysis));
+        .route("/analyze", post(api::analyze::start_analysis))
+        .route("/output/start", post(api::output::start_output))
+        .route("/output/stop", post(api::output::stop_output))
+        .route("/output/status", get(api::output::get_output_status));
 
     let app = Router::new()
         .nest("/api", api_routes)
