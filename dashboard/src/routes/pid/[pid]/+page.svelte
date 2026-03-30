@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { fetchPidFullDetail } from '$lib/api';
 	import HexViewer from '$lib/components/HexViewer.svelte';
+	import FrameTimeline from '$lib/components/FrameTimeline.svelte';
 
 	let detail = $state<any>(null);
 	let error = $state('');
@@ -230,6 +231,12 @@
 			<div class="kv"><span class="k">Last Packet</span><span class="v mono">{detail.last_packet_index.toLocaleString()}</span></div>
 			<div class="kv"><span class="k">Span</span><span class="v mono">{(detail.last_packet_index - detail.first_packet_index).toLocaleString()} packets</span></div>
 		</div>
+	</div>
+
+	<!-- Frame Analysis -->
+	<div class="card">
+		<h3>Frame Analysis</h3>
+		<FrameTimeline {pid} />
 	</div>
 
 	<!-- HEX Viewer -->

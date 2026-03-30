@@ -69,3 +69,43 @@ export async function fetchPidPackets(pid: number, offset = 0, limit = 16): Prom
 	if (!res.ok) throw new Error(`PID ${pid} packets not found`);
 	return res.json();
 }
+
+export interface FrameEntry {
+	index: number;
+	packet_index: number;
+	frame_type: string;
+	size_bytes: number;
+	pts: number | null;
+	dts: number | null;
+	info: { Video?: VideoFrame; Audio?: AudioFrame };
+}
+
+export interface VideoFrame {
+	codec: string;
+	frame_type: string;
+	size_bytes: number;
+	pts: number | null;
+	dts: number | null;
+	width: number | null;
+	height: number | null;
+	profile: string | null;
+	level: string | null;
+}
+
+export interface AudioFrame {
+	codec: string;
+	sample_rate: number;
+	channels: number;
+	channel_layout: string;
+	bitrate_kbps: number;
+	frame_size: number;
+	pts: number | null;
+	dialog_norm: number | null;
+	atmos_joc: boolean;
+}
+
+export async function fetchPidFrames(pid: number, offset = 0, limit = 200): Promise<FrameEntry[]> {
+	const res = await fetch(`${BASE}/pids/${pid}/frames?offset=${offset}&limit=${limit}`);
+	if (!res.ok) throw new Error(`PID ${pid} frames not found`);
+	return res.json();
+}
