@@ -233,7 +233,39 @@
 - 세션 저장/불러오기: 분석 결과 스냅샷 저장
 - 보고서 생성: PDF/HTML 리포트 (분석 요약, 에러 목록, 차트 포함)
 
-## Phase 20 - 성능 최적화 및 프로덕션
+## Phase 20 - 경량 로컬 데이터베이스 (히스토리 관리)
+- SQLite 탑재 (rusqlite 또는 sqlx + SQLite)
+- 스키마 설계
+  - sessions: 분석 세션 (id, filename/url, start_time, end_time, duration, total_packets, bitrate)
+  - pid_snapshots: 세션별 PID 통계 스냅샷 (session_id, pid, label, stream_type, packets, cc_errors, bitrate)
+  - errors: 에러 이벤트 (session_id, timestamp, type, priority, pid, detail)
+  - pcr_history: PCR 샘플 시계열 (session_id, pid, packet_index, pcr_value, jitter_ms)
+  - bitrate_history: 비트레이트 시계열 (session_id, timestamp, total_bps, per_pid JSON)
+  - alerts: 알림 이력 (session_id, timestamp, level, message, acknowledged)
+  - output_logs: 송출 세션 이력 (session_id, config, start, end, packets_sent, avg_bitrate)
+- 자동 기록
+  - 파일 분석 완료 시 세션 + PID 스냅샷 자동 저장
+  - 라이브 모니터링 시 1초 간격 bitrate/pcr 시계열 기록
+  - TR 101 290 에러 발생 시 즉시 기록
+  - 송출 start/stop 이벤트 기록
+- API
+  - GET /api/history/sessions (목록, 필터, 페이징)
+  - GET /api/history/sessions/:id (세션 상세 + PID + 에러)
+  - GET /api/history/sessions/:id/bitrate (비트레이트 시계열)
+  - GET /api/history/sessions/:id/errors (에러 목록, type/priority 필터)
+  - DELETE /api/history/sessions/:id
+  - GET /api/history/stats (전체 통계: 총 세션수, 총 에러수, 가동 시간)
+- Dashboard
+  - /history 페이지: 세션 목록 테이블 (날짜, 파일명, 비트레이트, 에러 수)
+  - 세션 클릭 → 과거 분석 결과 재열람
+  - 에러 트렌드 차트: 일별/주별 에러 발생 추이
+  - 비트레이트 히스토리 차트: 장기 시계열 (시간대별 평균/최대)
+  - 세션 비교: 2개 세션 나란히 diff 뷰
+  - 데이터 보존 정책: 설정 가능한 retention (기본 30일, 오래된 자동 삭제)
+- DB 마이그레이션: 버전별 스키마 업그레이드 (embedded migrations)
+- 단일 바이너리: SQLite 파일 하나로 portable (data/ts-engine.db)
+
+## Phase 21 - 성능 최적화 및 프로덕션
 - Rust 멀티스레드 분석 파이프라인 (rayon 또는 tokio 병렬)
 - 대용량 파일 랜덤 액세스 (mmap 기반)
 - WebSocket 메시지 압축 (MessagePack 또는 CBOR)
