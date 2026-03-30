@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/ts-core",
     "crates/ts-analyzer",
+    "crates/ts-decoder",
     "crates/ts-server",
 ]
 

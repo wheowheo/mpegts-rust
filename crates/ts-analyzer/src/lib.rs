@@ -6,6 +6,7 @@ pub mod output_stats;
 pub mod system_stats;
 pub mod capacity;
 pub mod pid_detail;
+pub mod frame_index;
 
 use std::collections::{HashMap, VecDeque};
 use ts_core::packet::{TsPacket, TS_PACKET_SIZE};
@@ -20,6 +21,7 @@ use pcr_jitter::PcrJitterAnalyzer;
 use bitrate_stats::BitrateStats;
 use stream_info::StreamInfo;
 use pid_detail::PidDetailCollector;
+use frame_index::FrameIndexer;
 
 pub struct StreamAnalyzer {
     pub pid_map: PidMap,
@@ -38,6 +40,7 @@ pub struct StreamAnalyzer {
     psi_buffers: HashMap<u16, Vec<u8>>,
     pub pid_details: HashMap<u16, PidDetailCollector>,
     pes_assemblers: HashMap<u16, ts_core::pes::PesAssembler>,
+    pub frame_indexers: HashMap<u16, FrameIndexer>,
 
     pub raw_packets: HashMap<u16, VecDeque<Vec<u8>>>,
 
@@ -61,6 +64,7 @@ impl StreamAnalyzer {
             psi_buffers: HashMap::new(),
             pid_details: HashMap::new(),
             pes_assemblers: HashMap::new(),
+            frame_indexers: HashMap::new(),
             raw_packets: HashMap::new(),
             packet_index: 0,
             filename: String::new(),
@@ -138,6 +142,14 @@ impl StreamAnalyzer {
                     if let Some(detail) = self.pid_details.get_mut(&pid) {
                         detail.feed_pes_header(&pes.header, self.packet_index);
                     }
+                    let indexer = self.frame_indexers.entry(pid)
+                        .or_insert_with(FrameIndexer::new);
+                    if let Some(info) = self.pid_map.pids.get(&pid) {
+                        if let Some(st) = info.stream_type {
+                            indexer.set_stream_type(st);
+                        }
+                    }
+                    indexer.feed_pes(&pes.data, pes.header.pts, pes.header.dts, self.packet_index);
                 }
             }
         }

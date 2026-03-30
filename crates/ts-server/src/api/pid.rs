@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ts_analyzer::pid_detail::PidDetailData;
+use ts_analyzer::frame_index::FrameEntry;
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -124,4 +125,35 @@ pub async fn get_pid_packets(
         .collect();
 
     Ok(Json(result))
+}
+
+pub async fn get_pid_frames(
+    State(state): State<Arc<AppState>>,
+    Path(pid): Path<u16>,
+    Query(q): Query<PacketsQuery>,
+) -> Result<Json<Vec<FrameEntry>>, StatusCode> {
+    let analyzer = state.analyzer.read().await;
+    let indexer = analyzer.frame_indexers.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
+
+    let offset = q.offset.unwrap_or(0);
+    let limit = q.limit.unwrap_or(100).min(500);
+
+    let result: Vec<FrameEntry> = indexer.frames
+        .iter()
+        .skip(offset)
+        .take(limit)
+        .cloned()
+        .collect();
+
+    Ok(Json(result))
+}
+
+pub async fn get_pid_frame(
+    State(state): State<Arc<AppState>>,
+    Path((pid, idx)): Path<(u16, usize)>,
+) -> Result<Json<FrameEntry>, StatusCode> {
+    let analyzer = state.analyzer.read().await;
+    let indexer = analyzer.frame_indexers.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
+
+    indexer.frames.get(idx).cloned().map(Json).ok_or(StatusCode::NOT_FOUND)
 }
