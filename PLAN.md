@@ -109,3 +109,15 @@
 - 세션별 독립 모니터링
 - 자동 경고: CC 에러 급증, 비트레이트 이탈, 지터 임계값 초과
 - 전체 동작 테스트 (파일→UDP, 파일→RTP, UDP→UDP 릴레이)
+
+## Phase 12 - Dashboard: 계측기 수준 UI 리디자인
+- 전체 테마: 방송 계측기 스타일 다크 UI (짙은 navy/charcoal 배경, 형광 accent)
+- 헤더: 장비 모델명 스타일 로고, 연결 상태 LED 인디케이터, 시계
+- StreamSummary: 큰 숫자 계기판 스타일, 비트레이트 LED 바 그래프
+- PidMap: 컬러 코딩 강화 (video=cyan, audio=green, PSI=yellow, null=gray)
+- BitrateChart: 오실로스코프 스타일 그리드, 형광 그린 라인
+- PcrTimeline: 지터 범위 게이지 + 임계값 라인
+- CcErrors: 에러 카운터 7-segment 디스플레이 스타일
+- PsiViewer: 트리 구조 블록 다이어그램 스타일
+- Drop zone: 장비 패널 슬롯 스타일
+- 반응형 그리드 레이아웃 최적화

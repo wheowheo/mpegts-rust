@@ -20,9 +20,7 @@
 		const ws = createWsConnection((data) => {
 			store.pushRealtime(data);
 		});
-
 		loadInitialData();
-
 		return () => ws.close();
 	});
 
@@ -31,31 +29,25 @@
 			const [info, pids] = await Promise.all([fetchStreamInfo(), fetchPids()]);
 			store.setStreamInfo(info);
 			store.updatePids(pids);
-		} catch {
-			// server may not have data yet
-		}
+		} catch {}
 	}
 
 	async function processFile(file: File) {
 		if (!file.name.match(/\.(ts|mts|m2ts)$/i)) {
-			uploadError = 'Unsupported file type. Use .ts, .mts, or .m2ts';
+			uploadError = 'Unsupported format. Accepts .ts .mts .m2ts';
 			return;
 		}
-
 		uploadError = '';
 		store.setAnalyzing(true);
 		store.reset();
-
 		const sizeMB = (file.size / 1_048_576).toFixed(1);
-		uploadProgress = `Uploading ${file.name} (${sizeMB} MB)...`;
-
+		uploadProgress = `${file.name} (${sizeMB} MB)`;
 		try {
 			await uploadFile(file);
-			uploadProgress = 'Analyzing...';
+			uploadProgress = '';
 			const [info, pids] = await Promise.all([fetchStreamInfo(), fetchPids()]);
 			store.setStreamInfo(info);
 			store.updatePids(pids);
-			uploadProgress = '';
 		} catch (e) {
 			uploadError = e instanceof Error ? e.message : 'Upload failed';
 			uploadProgress = '';
@@ -64,10 +56,9 @@
 		}
 	}
 
-	async function handleUpload() {
+	function handleUpload() {
 		const file = fileInput?.files?.[0];
-		if (!file) return;
-		await processFile(file);
+		if (file) processFile(file);
 	}
 
 	function handleDrop(e: DragEvent) {
@@ -76,20 +67,6 @@
 		const file = e.dataTransfer?.files?.[0];
 		if (file) processFile(file);
 	}
-
-	function handleDragOver(e: DragEvent) {
-		e.preventDefault();
-		dragging = true;
-	}
-
-	function handleDragLeave(e: DragEvent) {
-		e.preventDefault();
-		dragging = false;
-	}
-
-	function handleClick() {
-		fileInput?.click();
-	}
 </script>
 
 <div class="page">
@@ -97,59 +74,58 @@
 	<div
 		class="dropzone"
 		class:dragging
-		class:has-data={!!store.streamInfo}
+		class:compact={!!store.streamInfo}
 		ondrop={handleDrop}
-		ondragover={handleDragOver}
-		ondragleave={handleDragLeave}
-		onclick={handleClick}
+		ondragover={(e) => { e.preventDefault(); dragging = true; }}
+		ondragleave={(e) => { e.preventDefault(); dragging = false; }}
+		onclick={() => fileInput?.click()}
 		role="button"
 		tabindex="0"
-		onkeydown={(e) => e.key === 'Enter' && handleClick()}
+		onkeydown={(e) => e.key === 'Enter' && fileInput?.click()}
 	>
-		<input
-			type="file"
-			accept=".ts,.mts,.m2ts"
-			bind:this={fileInput}
-			onchange={handleUpload}
-			class="hidden-input"
-		/>
+		<input type="file" accept=".ts,.mts,.m2ts" bind:this={fileInput} onchange={handleUpload} class="sr-only" />
 
 		{#if store.analyzing}
-			<div class="drop-content">
+			<div class="drop-inner">
 				<div class="spinner"></div>
-				<span class="drop-text">{uploadProgress || 'Analyzing...'}</span>
+				<div class="drop-label">ANALYZING</div>
+				<div class="drop-sub">{uploadProgress}</div>
 			</div>
 		{:else if dragging}
-			<div class="drop-content">
-				<span class="drop-icon">+</span>
-				<span class="drop-text">Drop TS file here</span>
+			<div class="drop-inner">
+				<div class="drop-icon pulse">+</div>
+				<div class="drop-label">DROP FILE</div>
 			</div>
 		{:else}
-			<div class="drop-content">
-				<span class="drop-icon">&uarr;</span>
-				<span class="drop-text">
-					Drop MPEG-TS file here or <span class="link">browse</span>
-				</span>
-				<span class="drop-hint">.ts .mts .m2ts</span>
+			<div class="drop-inner">
+				<div class="drop-icon">&uarr;</div>
+				<div class="drop-label">INPUT</div>
+				<div class="drop-sub">Drop MPEG-TS file or <span class="link">browse</span></div>
+				<div class="drop-formats">.ts .mts .m2ts</div>
 			</div>
 		{/if}
-
 		{#if uploadError}
-			<div class="error">{uploadError}</div>
+			<div class="drop-error">{uploadError}</div>
 		{/if}
 	</div>
 
 	{#if store.streamInfo}
 		<StreamSummary info={store.streamInfo} />
 
-		<div class="charts-row">
+		<div class="scope-row">
 			<BitrateChart data={store.bitrateHistory} />
 			<PcrTimeline data={store.pcrJitter} />
 		</div>
 
-		<PsiViewer info={store.streamInfo} />
-		<PidMap pids={store.pids} />
-		<CcErrors errors={store.ccErrors} />
+		<div class="detail-row">
+			<div class="detail-left">
+				<PsiViewer info={store.streamInfo} />
+				<CcErrors errors={store.ccErrors} />
+			</div>
+			<div class="detail-right">
+				<PidMap pids={store.pids} />
+			</div>
+		</div>
 	{/if}
 </div>
 
@@ -157,105 +133,125 @@
 	.page {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.6rem;
 	}
 
+	/* Drop zone - equipment slot style */
 	.dropzone {
-		border: 2px dashed var(--border);
-		border-radius: 12px;
-		padding: 2rem;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 2.5rem 1rem;
 		text-align: center;
 		cursor: pointer;
 		transition: all 0.2s;
-		background: var(--card-bg);
+		position: relative;
 	}
-
+	.dropzone::before {
+		content: '';
+		position: absolute;
+		top: 0; left: 12px; right: 12px;
+		height: 1px;
+		background: linear-gradient(90deg, transparent, var(--accent), transparent);
+		opacity: 0.2;
+	}
 	.dropzone:hover {
-		border-color: #2563eb;
-		background: color-mix(in srgb, #2563eb 5%, var(--card-bg));
+		border-color: rgba(0, 212, 255, 0.3);
 	}
-
 	.dropzone.dragging {
-		border-color: #2563eb;
-		border-style: solid;
-		background: color-mix(in srgb, #2563eb 10%, var(--card-bg));
-		transform: scale(1.01);
+		border-color: var(--accent);
+		background: rgba(0, 212, 255, 0.05);
+	}
+	.dropzone.compact {
+		padding: 0.8rem 1rem;
 	}
 
-	.dropzone.has-data {
-		padding: 1rem;
-	}
-
-	.drop-content {
+	.drop-inner {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.3rem;
 	}
-
+	.dropzone.compact .drop-inner {
+		flex-direction: row;
+		gap: 0.6rem;
+	}
 	.drop-icon {
-		font-size: 2rem;
-		line-height: 1;
-		color: #2563eb;
+		font-size: 1.8rem;
+		color: var(--accent);
 		font-weight: 300;
+		line-height: 1;
 	}
+	.dropzone.compact .drop-icon { font-size: 1rem; }
+	.drop-icon.pulse { animation: pulse 1s ease-in-out infinite; }
+	@keyframes pulse { 50% { opacity: 0.4; } }
 
-	.dropzone.has-data .drop-icon {
-		font-size: 1.2rem;
+	.drop-label {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		font-weight: 600;
+		color: var(--accent);
+		letter-spacing: 0.15em;
 	}
-
-	.drop-text {
-		font-size: 0.9rem;
-		color: var(--text-muted);
-	}
-
-	.dropzone.has-data .drop-text {
-		font-size: 0.8rem;
-	}
-
-	.drop-hint {
+	.drop-sub {
 		font-size: 0.75rem;
 		color: var(--text-muted);
-		opacity: 0.6;
 	}
-
-	.link {
-		color: #2563eb;
-		text-decoration: underline;
+	.drop-formats {
+		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		color: var(--text-dim);
+		letter-spacing: 0.1em;
 	}
-
-	.hidden-input {
-		display: none;
+	.link { color: var(--accent); text-decoration: underline; }
+	.drop-error {
+		color: var(--red);
+		font-size: 0.75rem;
+		margin-top: 0.4rem;
 	}
 
 	.spinner {
-		width: 24px;
-		height: 24px;
+		width: 20px; height: 20px;
 		border: 2px solid var(--border);
-		border-top-color: #2563eb;
+		border-top-color: var(--accent);
 		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
+		animation: spin 0.7s linear infinite;
+	}
+	@keyframes spin { to { transform: rotate(360deg); } }
+
+	.sr-only {
+		position: absolute;
+		width: 1px; height: 1px;
+		padding: 0; margin: -1px;
+		overflow: hidden;
+		clip: rect(0,0,0,0);
+		border: 0;
 	}
 
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
-	.error {
-		color: #ef4444;
-		font-size: 0.8rem;
-		margin-top: 0.5rem;
-	}
-
-	.charts-row {
+	/* Layout grids */
+	.scope-row {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
+		gap: 0.6rem;
+	}
+	.detail-row {
+		display: grid;
+		grid-template-columns: 380px 1fr;
+		gap: 0.6rem;
+	}
+	.detail-left {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+	.detail-right {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
 	}
 
-	@media (max-width: 768px) {
-		.charts-row {
-			grid-template-columns: 1fr;
-		}
+	@media (max-width: 900px) {
+		.scope-row { grid-template-columns: 1fr; }
+		.detail-row { grid-template-columns: 1fr; }
 	}
 </style>

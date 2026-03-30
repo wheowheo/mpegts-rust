@@ -13,13 +13,13 @@
 			data: {
 				labels: [],
 				datasets: [{
-					label: 'Bitrate (Mbps)',
+					label: 'Bitrate',
 					data: [],
-					borderColor: '#3b82f6',
-					backgroundColor: 'rgba(59, 130, 246, 0.1)',
+					borderColor: '#00ff88',
+					backgroundColor: 'rgba(0, 255, 136, 0.06)',
 					borderWidth: 1.5,
 					fill: true,
-					tension: 0.3,
+					tension: 0.2,
 					pointRadius: 0,
 				}],
 			},
@@ -30,13 +30,18 @@
 				scales: {
 					x: {
 						display: true,
-						ticks: { color: '#71717a', maxTicksLimit: 8 },
-						grid: { color: '#27272a' },
+						ticks: { color: '#3a4560', font: { family: 'JetBrains Mono', size: 9 }, maxTicksLimit: 6 },
+						grid: { color: '#1a2030', lineWidth: 0.5 },
 					},
 					y: {
 						display: true,
-						ticks: { color: '#71717a' },
-						grid: { color: '#27272a' },
+						ticks: {
+							color: '#3a4560',
+							font: { family: 'JetBrains Mono', size: 9 },
+							callback: (v: any) => v.toFixed(1),
+						},
+						grid: { color: '#1a2030', lineWidth: 0.5 },
+						title: { display: true, text: 'Mbps', color: '#3a4560', font: { family: 'JetBrains Mono', size: 9 } },
 					},
 				},
 				plugins: {
@@ -61,14 +66,18 @@
 
 <div class="card">
 	<h3>Bitrate</h3>
-	<div class="chart-container">
+	<div class="scope">
 		<canvas bind:this={canvas}></canvas>
 	</div>
 </div>
 
 <style>
-	.chart-container {
-		height: 200px;
+	.scope {
+		height: 180px;
 		position: relative;
+		background: var(--bg-inset);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 4px;
 	}
 </style>

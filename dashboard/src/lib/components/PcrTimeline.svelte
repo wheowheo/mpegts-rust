@@ -13,13 +13,13 @@
 			data: {
 				labels: [],
 				datasets: [{
-					label: 'PCR Jitter (ms)',
+					label: 'Jitter',
 					data: [],
-					borderColor: '#f59e0b',
-					backgroundColor: 'rgba(245, 158, 11, 0.1)',
+					borderColor: '#ffb800',
+					backgroundColor: 'rgba(255, 184, 0, 0.06)',
 					borderWidth: 1.5,
 					fill: true,
-					tension: 0.3,
+					tension: 0.2,
 					pointRadius: 0,
 				}],
 			},
@@ -30,13 +30,17 @@
 				scales: {
 					x: {
 						display: true,
-						ticks: { color: '#71717a', maxTicksLimit: 8 },
-						grid: { color: '#27272a' },
+						ticks: { color: '#3a4560', font: { family: 'JetBrains Mono', size: 9 }, maxTicksLimit: 6 },
+						grid: { color: '#1a2030', lineWidth: 0.5 },
 					},
 					y: {
 						display: true,
-						ticks: { color: '#71717a' },
-						grid: { color: '#27272a' },
+						ticks: {
+							color: '#3a4560',
+							font: { family: 'JetBrains Mono', size: 9 },
+						},
+						grid: { color: '#1a2030', lineWidth: 0.5 },
+						title: { display: true, text: 'ms', color: '#3a4560', font: { family: 'JetBrains Mono', size: 9 } },
 					},
 				},
 				plugins: {
@@ -61,14 +65,18 @@
 
 <div class="card">
 	<h3>PCR Jitter</h3>
-	<div class="chart-container">
+	<div class="scope">
 		<canvas bind:this={canvas}></canvas>
 	</div>
 </div>
 
 <style>
-	.chart-container {
-		height: 200px;
+	.scope {
+		height: 180px;
 		position: relative;
+		background: var(--bg-inset);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 4px;
 	}
 </style>

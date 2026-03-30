@@ -7,15 +7,22 @@
 
 	function formatTime(ts: number): string {
 		const d = new Date(ts);
-		return d.toLocaleTimeString();
+		return d.toTimeString().slice(0, 8);
 	}
 </script>
 
 <div class="card">
-	<h3>CC Errors ({errors.length})</h3>
-	{#if errors.length === 0}
-		<p style="color: var(--text-muted); font-size: 0.85rem;">No continuity counter errors detected.</p>
-	{:else}
+	<h3>CC Errors</h3>
+	<div class="counter-row">
+		<div class="counter-display" class:has-error={errors.length > 0}>
+			<span class="seg-number" class:red={errors.length > 0} class:green={errors.length === 0}>
+				{errors.length.toString().padStart(4, '0')}
+			</span>
+		</div>
+		<span class="counter-label">TOTAL ERRORS</span>
+	</div>
+
+	{#if errors.length > 0}
 		<div class="table-wrap">
 			<table>
 				<thead>
@@ -27,27 +34,60 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each errors.slice(-50).reverse() as err}
+					{#each errors.slice(-30).reverse() as err}
 					<tr>
 						<td class="mono">{formatTime(err.ts)}</td>
 						<td class="mono">{pidHex(err.pid)}</td>
 						<td class="mono">{err.expected}</td>
-						<td class="mono error-val">{err.got}</td>
+						<td class="mono err-val">{err.got}</td>
 					</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+	{:else}
+		<div class="ok-msg">
+			<span class="led led-green"></span>
+			No continuity errors detected
+		</div>
 	{/if}
 </div>
 
 <style>
-	.table-wrap {
-		overflow-x: auto;
-		max-height: 300px;
-		overflow-y: auto;
+	.counter-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin-bottom: 0.5rem;
 	}
-	.error-val {
-		color: var(--error);
+	.counter-display {
+		background: var(--bg-inset);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.2rem 0.6rem;
+	}
+	.counter-display.has-error {
+		border-color: rgba(255, 59, 92, 0.3);
+	}
+	.counter-label {
+		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		color: var(--text-dim);
+		letter-spacing: 0.1em;
+	}
+	.table-wrap {
+		overflow: auto;
+		max-height: 220px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+	}
+	.err-val { color: var(--red); }
+	.ok-msg {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		padding: 0.5rem 0;
 	}
 </style>
