@@ -18,6 +18,12 @@ export async function fetchPidDetail(pid: number): Promise<PidInfo> {
 	return res.json();
 }
 
+export async function fetchPidFullDetail(pid: number): Promise<any> {
+	const res = await fetch(`${BASE}/pids/${pid}/detail`);
+	if (!res.ok) throw new Error(`PID ${pid} not found`);
+	return res.json();
+}
+
 export async function uploadFile(file: File): Promise<{ status: string; total_packets: number; filename: string }> {
 	const form = new FormData();
 	form.append('file', file);

@@ -34,6 +34,7 @@ async fn main() {
         .route("/stream", get(api::stream::get_stream_info))
         .route("/pids", get(api::pid::get_pid_map))
         .route("/pids/{pid}", get(api::pid::get_pid_detail))
+        .route("/pids/{pid}/detail", get(api::pid::get_pid_full_detail))
         .route("/analyze", post(api::analyze::start_analysis)
             .layer(DefaultBodyLimit::max(4 * 1024 * 1024 * 1024)))
         .route("/output/start", post(api::output::start_output))

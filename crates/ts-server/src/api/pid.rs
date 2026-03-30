@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 use std::sync::Arc;
+use ts_analyzer::pid_detail::PidDetailData;
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -72,4 +73,18 @@ pub async fn get_pid_detail(
             })
         })
         .ok_or(StatusCode::NOT_FOUND)
+}
+
+pub async fn get_pid_full_detail(
+    State(state): State<Arc<AppState>>,
+    Path(pid): Path<u16>,
+) -> Result<Json<PidDetailData>, StatusCode> {
+    let analyzer = state.analyzer.read().await;
+    let total = analyzer.pid_map.total_packets.max(1) as f64;
+
+    let info = analyzer.pid_map.pids.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
+    let detail = analyzer.pid_details.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
+
+    let percentage = (info.packet_count as f64 / total) * 100.0;
+    Ok(Json(detail.build_detail(info.bitrate_bps, percentage, &info.label, info.stream_type)))
 }

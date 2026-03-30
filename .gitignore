@@ -15,6 +15,9 @@ dashboard/build
 *.swo
 *~
 
+# Sample TS files (large binary)
+sample/
+
 # OS
 .DS_Store
 Thumbs.db

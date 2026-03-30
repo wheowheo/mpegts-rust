@@ -5,6 +5,7 @@ pub mod bitrate_stats;
 pub mod output_stats;
 pub mod system_stats;
 pub mod capacity;
+pub mod pid_detail;
 
 use std::collections::HashMap;
 use ts_core::packet::{TsPacket, TS_PACKET_SIZE};
@@ -18,6 +19,7 @@ use continuity::ContinuityChecker;
 use pcr_jitter::PcrJitterAnalyzer;
 use bitrate_stats::BitrateStats;
 use stream_info::StreamInfo;
+use pid_detail::PidDetailCollector;
 
 pub struct StreamAnalyzer {
     pub pid_map: PidMap,
@@ -33,8 +35,9 @@ pub struct StreamAnalyzer {
     pmt_pids: Vec<u16>,
     scte35_pids: Vec<u16>,
 
-    // PSI section assembly buffers (pid -> accumulated payload)
     psi_buffers: HashMap<u16, Vec<u8>>,
+    pub pid_details: HashMap<u16, PidDetailCollector>,
+    pes_assemblers: HashMap<u16, ts_core::pes::PesAssembler>,
 
     packet_index: u64,
     filename: String,
@@ -54,6 +57,8 @@ impl StreamAnalyzer {
             pmt_pids: Vec::new(),
             scte35_pids: Vec::new(),
             psi_buffers: HashMap::new(),
+            pid_details: HashMap::new(),
+            pes_assemblers: HashMap::new(),
             packet_index: 0,
             filename: String::new(),
         }
@@ -78,8 +83,22 @@ impl StreamAnalyzer {
         // PID map
         self.pid_map.update(pid, cc, scrambled, has_pcr);
 
+        // PID detail collection
+        let detail = self.pid_details.entry(pid)
+            .or_insert_with(|| PidDetailCollector::new(pid));
+        detail.feed_header(&pkt, self.packet_index);
+
         // CC check
         self.cc_checker.check(pid, cc, has_payload, self.packet_index);
+        // track CC errors in detail
+        if let Some(info) = self.pid_map.pids.get(&pid) {
+            if info.packet_count > 1 {
+                let expected = (info.last_cc) & 0x0F; // last_cc was already updated
+                if cc != expected && has_payload && pid != 0x1FFF {
+                    // note: pid_map already counted the error, we track detail separately
+                }
+            }
+        }
 
         // Bitrate tracking
         self.bitrate_stats.count_packet(pid);
@@ -99,6 +118,18 @@ impl StreamAnalyzer {
         // PSI/SCTE-35 payload processing
         if let Some(ref payload) = pkt.payload {
             self.process_payload(pid, payload, pkt.header.payload_unit_start);
+
+            // PES assembly for elementary streams
+            if pid != 0x0000 && pid != 0x1FFF && !self.pmt_pids.contains(&pid) && !self.scte35_pids.contains(&pid) {
+                let pusi = pkt.header.payload_unit_start;
+                let assembler = self.pes_assemblers.entry(pid)
+                    .or_insert_with(|| ts_core::pes::PesAssembler::new(pid));
+                if let Some(pes) = assembler.push(payload, pusi) {
+                    if let Some(detail) = self.pid_details.get_mut(&pid) {
+                        detail.feed_pes_header(&pes.header, self.packet_index);
+                    }
+                }
+            }
         }
 
         self.packet_index += 1;
@@ -149,6 +180,19 @@ impl StreamAnalyzer {
                             });
                         info.stream_type = Some(s.stream_type);
                         info.label = Pmt::stream_type_name(s.stream_type).to_string();
+
+                        // store descriptors for this PID
+                        if !s.descriptors.is_empty() {
+                            let detail = analyzer.pid_details.entry(s.elementary_pid)
+                                .or_insert_with(|| PidDetailCollector::new(s.elementary_pid));
+                            detail.set_descriptors(&s.descriptors);
+                        }
+                    }
+                    // store program-level descriptors on PMT PID itself
+                    if !pmt.program_descriptors.is_empty() {
+                        let detail = analyzer.pid_details.entry(pid)
+                            .or_insert_with(|| PidDetailCollector::new(pid));
+                        detail.set_descriptors(&pmt.program_descriptors);
                     }
                     analyzer.pmts.insert(pid, pmt);
                 }
