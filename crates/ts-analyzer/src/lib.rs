@@ -120,18 +120,32 @@ impl StreamAnalyzer {
         if self.pmt_pids.contains(&pid) {
             self.handle_psi(pid, payload, pusi, |analyzer, section| {
                 if let Ok(pmt) = Pmt::parse(section) {
-                    // SCTE-35 PID 감지
+                    // PMT PID 자체에 label 설정
+                    if let Some(info) = analyzer.pid_map.pids.get_mut(&pid) {
+                        info.label = "PMT".to_string();
+                    }
+
                     for s in &pmt.streams {
+                        // SCTE-35 PID 감지
                         if s.stream_type == 0x86 && !analyzer.scte35_pids.contains(&s.elementary_pid) {
                             analyzer.scte35_pids.push(s.elementary_pid);
                         }
-                    }
-                    // PID label 업데이트
-                    for s in &pmt.streams {
-                        if let Some(info) = analyzer.pid_map.pids.get_mut(&s.elementary_pid) {
-                            info.stream_type = Some(s.stream_type);
-                            info.label = Pmt::stream_type_name(s.stream_type).to_string();
-                        }
+
+                        // PID label/stream_type 업데이트 (엔트리 없으면 생성)
+                        let info = analyzer.pid_map.pids.entry(s.elementary_pid)
+                            .or_insert_with(|| ts_core::pid::PidInfo {
+                                pid: s.elementary_pid,
+                                label: String::new(),
+                                stream_type: None,
+                                packet_count: 0,
+                                cc_errors: 0,
+                                last_cc: 0,
+                                bitrate_bps: 0.0,
+                                has_pcr: false,
+                                scrambled: false,
+                            });
+                        info.stream_type = Some(s.stream_type);
+                        info.label = Pmt::stream_type_name(s.stream_type).to_string();
                     }
                     analyzer.pmts.insert(pid, pmt);
                 }
@@ -174,6 +188,16 @@ impl StreamAnalyzer {
         if let Some(buf) = self.psi_buffers.get(&pid).cloned() {
             if let Ok(section) = PsiSection::parse(&buf) {
                 handler(self, &section);
+            }
+        }
+    }
+
+    pub fn sync_pid_bitrates(&mut self) {
+        for (pid, info) in &mut self.pid_map.pids {
+            if let Some(samples) = self.bitrate_stats.pid_bitrate_samples(*pid) {
+                if let Some(last) = samples.last() {
+                    info.bitrate_bps = last.bitrate_bps;
+                }
             }
         }
     }

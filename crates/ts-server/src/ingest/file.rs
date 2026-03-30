@@ -20,6 +20,7 @@ pub fn analyze_bytes(data: &[u8], filename: &str) -> StreamAnalyzer {
         offset += TS_PACKET_SIZE;
     }
 
+    analyzer.sync_pid_bitrates();
     analyzer
 }
 
