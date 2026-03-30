@@ -44,6 +44,46 @@ export interface RealtimeData {
 	complete?: boolean;
 }
 
+export interface OutputConfig {
+	source_type: 'file' | 'udp';
+	source_path?: string;
+	source_addr?: string;
+	dest_addr: string;
+	dest_port: number;
+	protocol: 'udp' | 'rtp';
+	bitrate_bps: number;
+}
+
+export interface OutputStatus {
+	running: boolean;
+	config: OutputConfig | null;
+	packets_sent: number;
+	bytes_sent: number;
+	elapsed_sec: number;
+	actual_bitrate_bps: number;
+}
+
+export interface SystemSnapshot {
+	timestamp_sec: number;
+	cpu_usage_pct: number;
+	memory_used_bytes: number;
+	memory_total_bytes: number;
+	net_tx_bytes_sec: number;
+	net_tx_drops: number;
+}
+
+export interface CapacityEstimate {
+	cpu_headroom_pct: number;
+	net_headroom_bps: number;
+	estimated_additional_streams: number;
+	bottleneck: string;
+}
+
+export interface SystemResponse {
+	system: SystemSnapshot;
+	capacity: CapacityEstimate;
+}
+
 export interface Scte35Event {
 	pts: number;
 	command_type: string;

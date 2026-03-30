@@ -10,6 +10,7 @@
 			<a href="/" class="brand">TS Engine</a>
 			<div class="nav-links">
 				<a href="/">Dashboard</a>
+				<a href="/output">Output</a>
 				<a href="/scte35">SCTE-35</a>
 			</div>
 		</nav>
