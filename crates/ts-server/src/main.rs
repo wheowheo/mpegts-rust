@@ -27,6 +27,7 @@ async fn main() {
         analyzer: RwLock::new(ts_analyzer::StreamAnalyzer::new()),
         ws_tx: tx,
         output_session: RwLock::new(output::session::OutputSession::new()),
+        system_stats: RwLock::new(ts_analyzer::system_stats::SystemStatsCollector::new()),
     });
 
     let api_routes = Router::new()
@@ -36,7 +37,8 @@ async fn main() {
         .route("/analyze", post(api::analyze::start_analysis))
         .route("/output/start", post(api::output::start_output))
         .route("/output/stop", post(api::output::stop_output))
-        .route("/output/status", get(api::output::get_output_status));
+        .route("/output/status", get(api::output::get_output_status))
+        .route("/system", get(api::system::get_system_stats));
 
     let app = Router::new()
         .nest("/api", api_routes)

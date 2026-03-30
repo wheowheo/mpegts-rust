@@ -2,6 +2,9 @@ pub mod stream_info;
 pub mod continuity;
 pub mod pcr_jitter;
 pub mod bitrate_stats;
+pub mod output_stats;
+pub mod system_stats;
+pub mod capacity;
 
 use std::collections::HashMap;
 use ts_core::packet::{TsPacket, TS_PACKET_SIZE};
