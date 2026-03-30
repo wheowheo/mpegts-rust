@@ -36,7 +36,7 @@ async fn main() {
     let app = Router::new()
         .nest("/api", api_routes)
         .route("/ws", get(ws::realtime::ws_handler))
-        .fallback_service(ServeDir::new("../dashboard/build"))
+        .fallback_service(ServeDir::new("dashboard/build"))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state);
