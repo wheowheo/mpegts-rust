@@ -1,0 +1,8 @@
+target/
+node_modules/
+dashboard/node_modules/
+dashboard/.svelte-kit/
+dashboard/build/
+data/
+.git/
+*.md

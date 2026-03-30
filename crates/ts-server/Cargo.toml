@@ -21,3 +21,4 @@ reqwest = { version = "0.12", features = ["rustls-tls"], default-features = fals
 rusqlite = { version = "0.32", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+memmap2 = "0.9"

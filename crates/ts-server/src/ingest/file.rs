@@ -24,12 +24,12 @@ pub fn analyze_bytes(data: &[u8], filename: &str) -> StreamAnalyzer {
     analyzer
 }
 
-#[allow(dead_code)]
-pub fn analyze_file(path: &Path) -> std::io::Result<StreamAnalyzer> {
-    let data = std::fs::read(path)?;
+pub fn analyze_file_mmap(path: &Path) -> std::io::Result<StreamAnalyzer> {
+    let file = std::fs::File::open(path)?;
+    let mmap = unsafe { memmap2::Mmap::map(&file)? };
     let filename = path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    Ok(analyze_bytes(&data, &filename))
+    Ok(analyze_bytes(&mmap, &filename))
 }
