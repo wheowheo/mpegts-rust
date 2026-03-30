@@ -49,6 +49,8 @@ async fn main() {
         .route("/output/list", get(api::output::list_outputs))
         .route("/output/{session_id}", get(api::output::get_output_status))
         .route("/system", get(api::system::get_system_stats))
+        .route("/tr101290", get(api::tr101290::get_tr101290))
+        .route("/tr101290/errors", get(api::tr101290::get_tr101290_errors))
         .route("/ingest/start", post(api::ingest::start_ingest))
         .route("/ingest/stop", post(api::ingest::stop_ingest))
         .route("/ingest/status", get(api::ingest::get_ingest_status));

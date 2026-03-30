@@ -100,6 +100,25 @@ export interface IngestStatus {
 	packets_received: number;
 }
 
+export interface Tr101290Summary {
+	p1_count: number;
+	p2_count: number;
+	p3_count: number;
+	errors: Tr101290Error[];
+	p1_counters: Record<string, number>;
+	p2_counters: Record<string, number>;
+	p3_counters: Record<string, number>;
+}
+
+export interface Tr101290Error {
+	priority: string;
+	error_type: string;
+	description: string;
+	pid: number | null;
+	packet_index: number;
+	timestamp_ms: number;
+}
+
 export interface Scte35Event {
 	pts: number;
 	command_type: string;

@@ -7,6 +7,7 @@ pub mod system_stats;
 pub mod capacity;
 pub mod pid_detail;
 pub mod frame_index;
+pub mod tr101290;
 
 use std::collections::{HashMap, VecDeque};
 use ts_core::packet::{TsPacket, TS_PACKET_SIZE};
@@ -22,6 +23,7 @@ use bitrate_stats::BitrateStats;
 use stream_info::StreamInfo;
 use pid_detail::PidDetailCollector;
 use frame_index::FrameIndexer;
+use tr101290::Tr101290Checker;
 
 pub struct StreamAnalyzer {
     pub pid_map: PidMap,
@@ -43,6 +45,7 @@ pub struct StreamAnalyzer {
     pub frame_indexers: HashMap<u16, FrameIndexer>,
 
     pub raw_packets: HashMap<u16, VecDeque<Vec<u8>>>,
+    pub tr101290: Tr101290Checker,
 
     packet_index: u64,
     filename: String,
@@ -66,6 +69,7 @@ impl StreamAnalyzer {
             pes_assemblers: HashMap::new(),
             frame_indexers: HashMap::new(),
             raw_packets: HashMap::new(),
+            tr101290: Tr101290Checker::new(),
             packet_index: 0,
             filename: String::new(),
         }
@@ -76,9 +80,17 @@ impl StreamAnalyzer {
     }
 
     pub fn feed_packet(&mut self, data: &[u8]) {
+        // TR 101 290: sync byte check
+        if !data.is_empty() {
+            self.tr101290.check_sync(data[0], self.packet_index);
+        }
+
         let pkt = match TsPacket::parse(data) {
             Ok(p) => p,
-            Err(_) => return,
+            Err(_) => {
+                self.packet_index += 1;
+                return;
+            }
         };
 
         let pid = pkt.header.pid;
@@ -86,6 +98,15 @@ impl StreamAnalyzer {
         let has_payload = pkt.header.adaptation_field_control & 0x01 != 0;
         let scrambled = pkt.header.scrambling_control != 0;
         let has_pcr = pkt.adaptation.as_ref().and_then(|a| a.pcr).is_some();
+
+        // TR 101 290 checks
+        self.tr101290.check_tei(pkt.header.transport_error, pid, self.packet_index);
+        self.tr101290.check_cc(pid, cc, has_payload, self.packet_index);
+        self.tr101290.check_pat(pid, pid == 0x0000, self.packet_index);
+        self.tr101290.check_pmt(pid, self.packet_index);
+        self.tr101290.check_pid_presence(pid, self.packet_index);
+        self.tr101290.check_nit(pid == 0x0010, self.packet_index);
+        self.tr101290.check_sdt(pid == 0x0011, self.packet_index);
 
         // raw packet storage (last 64 per PID)
         let buf = self.raw_packets.entry(pid).or_insert_with(VecDeque::new);
@@ -123,9 +144,15 @@ impl StreamAnalyzer {
         if let Some(ref af) = pkt.adaptation {
             if let Some(pcr_val) = af.pcr {
                 let pcr_info = PcrInfo::from_raw(pid, pcr_val, self.packet_index);
+                let pcr_secs = pcr_info.to_seconds();
                 self.bitrate_calc.update_pcr(pcr_val, self.packet_index);
-                self.bitrate_stats.update_pcr(pcr_val, pid, pcr_info.to_seconds());
+                self.bitrate_stats.update_pcr(pcr_val, pid, pcr_secs);
                 self.pcr_jitter.update(pcr_info);
+                self.tr101290.check_pcr(pid, pcr_val, self.packet_index);
+                self.tr101290.update_pcr_time(pcr_secs);
+                if let Some(bps) = self.bitrate_calc.bitrate_bps() {
+                    self.tr101290.set_packet_rate(bps / (TS_PACKET_SIZE as f64 * 8.0));
+                }
             }
         }
 
@@ -154,6 +181,11 @@ impl StreamAnalyzer {
             }
         }
 
+        // periodic TR 101 290 checks
+        if self.packet_index % 5000 == 0 {
+            self.tr101290.check_p3_intervals(self.packet_index);
+        }
+
         self.packet_index += 1;
     }
 
@@ -166,6 +198,9 @@ impl StreamAnalyzer {
                         .filter(|e| e.program_number != 0)
                         .map(|e| e.pid)
                         .collect();
+                    analyzer.tr101290.set_pmt_pids(&analyzer.pmt_pids);
+                    let all_pids: Vec<u16> = pat.entries.iter().map(|e| e.pid).collect();
+                    analyzer.tr101290.set_pat_pids(&all_pids);
                     analyzer.pat = Some(pat);
                 }
             });

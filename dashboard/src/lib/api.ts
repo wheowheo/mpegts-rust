@@ -1,4 +1,4 @@
-import type { StreamInfo, PidInfo, OutputConfig, OutputStatus, SystemResponse, IngestStatus } from './types';
+import type { StreamInfo, PidInfo, OutputConfig, OutputStatus, SystemResponse, IngestStatus, Tr101290Summary, Tr101290Error } from './types';
 
 const BASE = '/api';
 
@@ -146,5 +146,17 @@ export async function stopIngest(): Promise<IngestStatus> {
 
 export async function fetchIngestStatus(): Promise<IngestStatus> {
 	const res = await fetch(`${BASE}/ingest/status`);
+	return res.json();
+}
+
+export async function fetchTr101290(): Promise<Tr101290Summary> {
+	const res = await fetch(`${BASE}/tr101290`);
+	return res.json();
+}
+
+export async function fetchTr101290Errors(limit = 200, priority?: string): Promise<Tr101290Error[]> {
+	const params = new URLSearchParams({ limit: String(limit) });
+	if (priority) params.set('priority', priority);
+	const res = await fetch(`${BASE}/tr101290/errors?${params}`);
 	return res.json();
 }
