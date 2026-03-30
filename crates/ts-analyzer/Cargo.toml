@@ -8,3 +8,4 @@ ts-core = { path = "../ts-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+libc = "0.2"

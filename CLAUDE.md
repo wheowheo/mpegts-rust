@@ -18,6 +18,7 @@ MPEG-TS Engine + Dashboard: Rust 백엔드(ts-core, ts-analyzer, ts-server) + Sv
 - 불필요한 주석, docstring을 남발하지 않는다
 - 과도한 에러 핸들링이나 추상화를 하지 않는다
 - 외부 라이브러리 연동 시 절대 바이너리 호출(Command, subprocess, exec) 방식을 사용하지 않는다. 반드시 FFI, 바인딩 크레이트, 또는 네이티브 Rust 구현을 사용한다
+- 기존 코드에 바이너리 호출 방식이 있다면 발견 즉시 네이티브 구현으로 마이그레이션한다
 
 ## 빌드 & 테스트
 - `cargo build` / `cargo test` (Rust)
