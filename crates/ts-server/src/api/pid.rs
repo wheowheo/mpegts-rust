@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
+    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -156,4 +157,27 @@ pub async fn get_pid_frame(
     let indexer = analyzer.frame_indexers.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
 
     indexer.frames.get(idx).cloned().map(Json).ok_or(StatusCode::NOT_FOUND)
+}
+
+pub async fn get_pid_thumbnails(
+    State(state): State<Arc<AppState>>,
+    Path(pid): Path<u16>,
+) -> Result<Json<Vec<ts_decoder::thumbnail::ThumbnailInfo>>, StatusCode> {
+    let analyzer = state.analyzer.read().await;
+    let indexer = analyzer.frame_indexers.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
+    Ok(Json(indexer.thumb_extractor.list()))
+}
+
+pub async fn get_pid_thumbnail(
+    State(state): State<Arc<AppState>>,
+    Path((pid, idx)): Path<(u16, usize)>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let analyzer = state.analyzer.read().await;
+    let indexer = analyzer.frame_indexers.get(&pid).ok_or(StatusCode::NOT_FOUND)?;
+    let entry = indexer.thumb_extractor.thumbnails.get(idx).ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "image/jpeg")],
+        entry.jpeg_data.clone(),
+    ))
 }

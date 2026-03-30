@@ -38,6 +38,8 @@ async fn main() {
         .route("/pids/{pid}/packets", get(api::pid::get_pid_packets))
         .route("/pids/{pid}/frames", get(api::pid::get_pid_frames))
         .route("/pids/{pid}/frames/{idx}", get(api::pid::get_pid_frame))
+        .route("/pids/{pid}/thumbnails", get(api::pid::get_pid_thumbnails))
+        .route("/pids/{pid}/thumbnail/{idx}", get(api::pid::get_pid_thumbnail))
         .route("/analyze", post(api::analyze::start_analysis)
             .layer(DefaultBodyLimit::max(4 * 1024 * 1024 * 1024)))
         .route("/output/start", post(api::output::start_output))

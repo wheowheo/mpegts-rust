@@ -4,6 +4,7 @@
 	import { fetchPidFullDetail } from '$lib/api';
 	import HexViewer from '$lib/components/HexViewer.svelte';
 	import FrameTimeline from '$lib/components/FrameTimeline.svelte';
+	import ThumbnailStrip from '$lib/components/ThumbnailStrip.svelte';
 
 	let detail = $state<any>(null);
 	let error = $state('');
@@ -237,6 +238,12 @@
 	<div class="card">
 		<h3>Frame Analysis</h3>
 		<FrameTimeline {pid} />
+	</div>
+
+	<!-- Thumbnail Strip -->
+	<div class="card">
+		<h3>Thumbnails</h3>
+		<ThumbnailStrip {pid} />
 	</div>
 
 	<!-- HEX Viewer -->

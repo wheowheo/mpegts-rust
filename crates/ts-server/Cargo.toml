@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 ts-core = { path = "../ts-core" }
 ts-analyzer = { path = "../ts-analyzer" }
+ts-decoder = { path = "../ts-decoder" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

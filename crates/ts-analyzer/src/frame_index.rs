@@ -1,5 +1,6 @@
 use serde::Serialize;
 use ts_decoder::{h264, h265, ac3, aac, VideoFrame, AudioFrame, FrameInfo};
+use ts_decoder::thumbnail::ThumbnailExtractor;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FrameEntry {
@@ -14,6 +15,7 @@ pub struct FrameEntry {
 
 pub struct FrameIndexer {
     pub frames: Vec<FrameEntry>,
+    pub thumb_extractor: ThumbnailExtractor,
     stream_type: Option<u8>,
     pes_buffer: Vec<u8>,
     last_pts: Option<f64>,
@@ -26,6 +28,7 @@ impl FrameIndexer {
     pub fn new() -> Self {
         Self {
             frames: Vec::new(),
+            thumb_extractor: ThumbnailExtractor::new(30), // every 30 I-frames ~1sec@30fps
             stream_type: None,
             pes_buffer: Vec::new(),
             last_pts: None,
@@ -73,6 +76,17 @@ impl FrameIndexer {
                         .map(|s| format!("{:.1}", s.level_idc as f32 / 10.0));
 
                     let idx = self.frames.len();
+
+                    // thumbnail capture on I-frames
+                    if slice.slice_type_name == "I" {
+                        self.thumb_extractor.inc_frame();
+                        if self.thumb_extractor.should_capture() {
+                            let w = width.unwrap_or(1920);
+                            let h = height.unwrap_or(1080);
+                            self.thumb_extractor.add_placeholder(idx, self.last_pts, w, h);
+                        }
+                    }
+
                     self.frames.push(FrameEntry {
                         index: idx,
                         packet_index,

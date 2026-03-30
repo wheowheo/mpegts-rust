@@ -109,3 +109,22 @@ export async function fetchPidFrames(pid: number, offset = 0, limit = 200): Prom
 	if (!res.ok) throw new Error(`PID ${pid} frames not found`);
 	return res.json();
 }
+
+export interface ThumbnailInfo {
+	index: number;
+	frame_index: number;
+	pts: number | null;
+	width: number;
+	height: number;
+	size_bytes: number;
+}
+
+export async function fetchPidThumbnails(pid: number): Promise<ThumbnailInfo[]> {
+	const res = await fetch(`${BASE}/pids/${pid}/thumbnails`);
+	if (!res.ok) return [];
+	return res.json();
+}
+
+export function thumbnailUrl(pid: number, idx: number): string {
+	return `${BASE}/pids/${pid}/thumbnail/${idx}`;
+}

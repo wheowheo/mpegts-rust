@@ -3,6 +3,7 @@ pub mod h265;
 pub mod ac3;
 pub mod aac;
 pub mod bitreader;
+pub mod thumbnail;
 
 use serde::Serialize;
 
