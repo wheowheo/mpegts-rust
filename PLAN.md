@@ -146,7 +146,8 @@
 - 프레임 간격 분석: frame duration 일정성 검증
 
 ## Phase 16 - 프록시 썸네일 디코더
-- ffmpeg 연동 (Command 또는 FFI)
+- ffmpeg FFI 연동 (ffmpeg-sys-next 또는 ac-ffmpeg 크레이트)
+  - CLI 호출 지양, libav* 직접 바인딩
   - I-frame only 디코딩 → JPEG/WebP 썸네일 추출
   - 지정 간격 (예: 1초마다) 썸네일 생성
   - 해상도: 320px 폭 고정 (프록시 용도)
