@@ -1,4 +1,4 @@
-use axum::{routing::{get, post}, Router};
+use axum::{extract::DefaultBodyLimit, routing::{get, post}, Router};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
@@ -46,6 +46,7 @@ async fn main() {
         .nest("/api", api_routes)
         .route("/ws", get(ws::realtime::ws_handler))
         .fallback_service(ServeDir::new("dashboard/build"))
+        .layer(DefaultBodyLimit::max(2 * 1024 * 1024 * 1024)) // 2GB
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state);
