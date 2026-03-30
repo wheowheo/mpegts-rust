@@ -1,14 +1,214 @@
+pub mod stream_info;
+pub mod continuity;
+pub mod pcr_jitter;
+pub mod bitrate_stats;
+
+use std::collections::HashMap;
+use ts_core::packet::{TsPacket, TS_PACKET_SIZE};
 use ts_core::pid::PidMap;
+use ts_core::psi::{PsiSection, pat::Pat, pmt::Pmt};
+use ts_core::timing::PcrInfo;
+use ts_core::bitrate::BitrateCalculator;
+use ts_core::scte35::Scte35;
+
+use continuity::ContinuityChecker;
+use pcr_jitter::PcrJitterAnalyzer;
+use bitrate_stats::BitrateStats;
+use stream_info::StreamInfo;
 
 pub struct StreamAnalyzer {
     pub pid_map: PidMap,
+    pub cc_checker: ContinuityChecker,
+    pub pcr_jitter: PcrJitterAnalyzer,
+    pub bitrate_stats: BitrateStats,
+    pub bitrate_calc: BitrateCalculator,
+
+    pub pat: Option<Pat>,
+    pub pmts: HashMap<u16, Pmt>,
+    pub scte35_events: Vec<Scte35>,
+
+    pmt_pids: Vec<u16>,
+    scte35_pids: Vec<u16>,
+
+    // PSI section assembly buffers (pid -> accumulated payload)
+    psi_buffers: HashMap<u16, Vec<u8>>,
+
+    packet_index: u64,
+    filename: String,
 }
 
 impl StreamAnalyzer {
     pub fn new() -> Self {
         Self {
             pid_map: PidMap::new(),
+            cc_checker: ContinuityChecker::new(),
+            pcr_jitter: PcrJitterAnalyzer::new(),
+            bitrate_stats: BitrateStats::new(TS_PACKET_SIZE as u64),
+            bitrate_calc: BitrateCalculator::new(),
+            pat: None,
+            pmts: HashMap::new(),
+            scte35_events: Vec::new(),
+            pmt_pids: Vec::new(),
+            scte35_pids: Vec::new(),
+            psi_buffers: HashMap::new(),
+            packet_index: 0,
+            filename: String::new(),
         }
+    }
+
+    pub fn set_filename(&mut self, name: &str) {
+        self.filename = name.to_string();
+    }
+
+    pub fn feed_packet(&mut self, data: &[u8]) {
+        let pkt = match TsPacket::parse(data) {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        let pid = pkt.header.pid;
+        let cc = pkt.header.continuity_counter;
+        let has_payload = pkt.header.adaptation_field_control & 0x01 != 0;
+        let scrambled = pkt.header.scrambling_control != 0;
+        let has_pcr = pkt.adaptation.as_ref().and_then(|a| a.pcr).is_some();
+
+        // PID map
+        self.pid_map.update(pid, cc, scrambled, has_pcr);
+
+        // CC check
+        self.cc_checker.check(pid, cc, has_payload, self.packet_index);
+
+        // Bitrate tracking
+        self.bitrate_stats.count_packet(pid);
+        self.pcr_jitter.add_bytes(TS_PACKET_SIZE as u64);
+        self.bitrate_calc.add_bytes(TS_PACKET_SIZE as u64);
+
+        // PCR handling
+        if let Some(ref af) = pkt.adaptation {
+            if let Some(pcr_val) = af.pcr {
+                let pcr_info = PcrInfo::from_raw(pid, pcr_val, self.packet_index);
+                self.bitrate_calc.update_pcr(pcr_val, self.packet_index);
+                self.bitrate_stats.update_pcr(pcr_val, pid, pcr_info.to_seconds());
+                self.pcr_jitter.update(pcr_info);
+            }
+        }
+
+        // PSI/SCTE-35 payload processing
+        if let Some(ref payload) = pkt.payload {
+            self.process_payload(pid, payload, pkt.header.payload_unit_start);
+        }
+
+        self.packet_index += 1;
+    }
+
+    fn process_payload(&mut self, pid: u16, payload: &[u8], pusi: bool) {
+        // PAT
+        if pid == 0x0000 {
+            self.handle_psi(pid, payload, pusi, |analyzer, section| {
+                if let Ok(pat) = Pat::parse(section) {
+                    analyzer.pmt_pids = pat.entries.iter()
+                        .filter(|e| e.program_number != 0)
+                        .map(|e| e.pid)
+                        .collect();
+                    analyzer.pat = Some(pat);
+                }
+            });
+            return;
+        }
+
+        // PMT
+        if self.pmt_pids.contains(&pid) {
+            self.handle_psi(pid, payload, pusi, |analyzer, section| {
+                if let Ok(pmt) = Pmt::parse(section) {
+                    // SCTE-35 PID 감지
+                    for s in &pmt.streams {
+                        if s.stream_type == 0x86 && !analyzer.scte35_pids.contains(&s.elementary_pid) {
+                            analyzer.scte35_pids.push(s.elementary_pid);
+                        }
+                    }
+                    // PID label 업데이트
+                    for s in &pmt.streams {
+                        if let Some(info) = analyzer.pid_map.pids.get_mut(&s.elementary_pid) {
+                            info.stream_type = Some(s.stream_type);
+                            info.label = Pmt::stream_type_name(s.stream_type).to_string();
+                        }
+                    }
+                    analyzer.pmts.insert(pid, pmt);
+                }
+            });
+            return;
+        }
+
+        // SCTE-35
+        if self.scte35_pids.contains(&pid) {
+            if pusi && payload.len() > 1 {
+                let pointer = payload[0] as usize;
+                let start = 1 + pointer;
+                if start < payload.len() {
+                    if let Ok(scte) = Scte35::parse(&payload[start..]) {
+                        self.scte35_events.push(scte);
+                    }
+                }
+            }
+        }
+    }
+
+    fn handle_psi<F>(&mut self, pid: u16, payload: &[u8], pusi: bool, handler: F)
+    where
+        F: FnOnce(&mut Self, &PsiSection),
+    {
+        if pusi {
+            if payload.is_empty() {
+                return;
+            }
+            let pointer = payload[0] as usize;
+            let start = 1 + pointer;
+            if start >= payload.len() {
+                return;
+            }
+            self.psi_buffers.insert(pid, payload[start..].to_vec());
+        } else if let Some(buf) = self.psi_buffers.get_mut(&pid) {
+            buf.extend_from_slice(payload);
+        }
+
+        if let Some(buf) = self.psi_buffers.get(&pid).cloned() {
+            if let Ok(section) = PsiSection::parse(&buf) {
+                handler(self, &section);
+            }
+        }
+    }
+
+    pub fn stream_info(&self) -> StreamInfo {
+        let pmts: Vec<(u16, Pmt)> = self.pmts.iter().map(|(&k, v)| (k, v.clone())).collect();
+        let duration_ms = self.duration_ms();
+        let bitrate = self.bitrate_calc.bitrate_bps().unwrap_or(0.0);
+
+        StreamInfo::from_pat_pmt(
+            &self.filename,
+            self.pat.as_ref().unwrap_or(&Pat {
+                transport_stream_id: 0,
+                version: 0,
+                entries: Vec::new(),
+            }),
+            &pmts,
+            self.pid_map.total_packets,
+            bitrate,
+            duration_ms,
+        )
+    }
+
+    pub fn duration_ms(&self) -> Option<f64> {
+        let samples = self.pcr_jitter.samples();
+        if samples.len() < 2 {
+            return None;
+        }
+        let first = samples.first().unwrap().pcr_seconds;
+        let last = samples.last().unwrap().pcr_seconds;
+        Some((last - first) * 1000.0)
+    }
+
+    pub fn total_packets(&self) -> u64 {
+        self.packet_index
     }
 }
 
