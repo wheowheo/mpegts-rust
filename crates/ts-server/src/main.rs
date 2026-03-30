@@ -28,6 +28,7 @@ async fn main() {
         ws_tx: tx,
         output_manager: RwLock::new(output::session::OutputSessionManager::new()),
         system_stats: RwLock::new(ts_analyzer::system_stats::SystemStatsCollector::new()),
+        ingest: RwLock::new(None),
     });
 
     let api_routes = Router::new()
@@ -47,7 +48,10 @@ async fn main() {
         .route("/output/stop/{session_id}", post(api::output::stop_output))
         .route("/output/list", get(api::output::list_outputs))
         .route("/output/{session_id}", get(api::output::get_output_status))
-        .route("/system", get(api::system::get_system_stats));
+        .route("/system", get(api::system::get_system_stats))
+        .route("/ingest/start", post(api::ingest::start_ingest))
+        .route("/ingest/stop", post(api::ingest::stop_ingest))
+        .route("/ingest/status", get(api::ingest::get_ingest_status));
 
     let app = Router::new()
         .nest("/api", api_routes)

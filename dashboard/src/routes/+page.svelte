@@ -9,6 +9,7 @@
 	import PcrTimeline from '$lib/components/PcrTimeline.svelte';
 	import PsiViewer from '$lib/components/PsiViewer.svelte';
 	import CcErrors from '$lib/components/CcErrors.svelte';
+	import IngestControl from '$lib/components/IngestControl.svelte';
 
 	const store = getStreamStore();
 	let fileInput: HTMLInputElement;
@@ -107,6 +108,11 @@
 		{#if uploadError}
 			<div class="drop-error">{uploadError}</div>
 		{/if}
+	</div>
+
+	<div class="card">
+		<h3>Live Stream Input</h3>
+		<IngestControl />
 	</div>
 
 	{#if store.streamInfo}

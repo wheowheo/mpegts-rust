@@ -93,6 +93,13 @@ export interface SystemResponse {
 	capacity: CapacityEstimate;
 }
 
+export interface IngestStatus {
+	running: boolean;
+	url: string;
+	protocol: string;
+	packets_received: number;
+}
+
 export interface Scte35Event {
 	pts: number;
 	command_type: string;

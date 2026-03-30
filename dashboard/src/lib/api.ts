@@ -1,4 +1,4 @@
-import type { StreamInfo, PidInfo, OutputConfig, OutputStatus, SystemResponse } from './types';
+import type { StreamInfo, PidInfo, OutputConfig, OutputStatus, SystemResponse, IngestStatus } from './types';
 
 const BASE = '/api';
 
@@ -127,4 +127,24 @@ export async function fetchPidThumbnails(pid: number): Promise<ThumbnailInfo[]> 
 
 export function thumbnailUrl(pid: number, idx: number): string {
 	return `${BASE}/pids/${pid}/thumbnail/${idx}`;
+}
+
+export async function startIngest(url: string, protocol?: string): Promise<IngestStatus> {
+	const res = await fetch(`${BASE}/ingest/start`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ url, protocol }),
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export async function stopIngest(): Promise<IngestStatus> {
+	const res = await fetch(`${BASE}/ingest/stop`, { method: 'POST' });
+	return res.json();
+}
+
+export async function fetchIngestStatus(): Promise<IngestStatus> {
+	const res = await fetch(`${BASE}/ingest/status`);
+	return res.json();
 }
