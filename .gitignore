@@ -18,6 +18,9 @@ dashboard/build
 # Sample TS files (large binary)
 sample/
 
+# Database
+data/
+
 # OS
 .DS_Store
 Thumbs.db

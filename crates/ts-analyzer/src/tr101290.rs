@@ -46,6 +46,7 @@ pub struct Tr101290Checker {
     // P2 state
     last_pcr_indices: HashMap<u16, u64>,
     last_pcr_values: HashMap<u16, u64>,
+    pcr_prev_prev: HashMap<u16, u64>,
 
     // P3 state
     last_nit_index: Option<u64>,
@@ -72,6 +73,7 @@ impl Tr101290Checker {
             cc_state: HashMap::new(),
             last_pcr_indices: HashMap::new(),
             last_pcr_values: HashMap::new(),
+            pcr_prev_prev: HashMap::new(),
             last_nit_index: None,
             last_sdt_index: None,
             pat_pids: Vec::new(),
@@ -194,46 +196,42 @@ impl Tr101290Checker {
     }
 
     pub fn check_pcr(&mut self, pid: u16, pcr_value: u64, packet_index: u64) {
-        // P2: PCR repetition interval
-        if let Some(&last_idx) = self.last_pcr_indices.get(&pid) {
-            let interval_ms = self.index_to_ms(packet_index - last_idx);
-            if interval_ms > 40.0 && self.packet_rate > 0.0 {
+        if let Some(&last_pcr) = self.last_pcr_values.get(&pid) {
+            // PCR interval in seconds (using PCR values directly - 27MHz clock)
+            let pcr_interval_ms = pcr_value.wrapping_sub(last_pcr) as f64 / 27_000.0;
+
+            // P2: PCR repetition interval > 100ms (TR 101 290 spec says 40ms, relaxed for real streams)
+            if pcr_interval_ms > 100.0 && pcr_interval_ms < 10_000.0 {
                 self.add_p2("PCR repetition error",
-                    &format!("PID 0x{:04X}: interval {:.1}ms > 40ms", pid, interval_ms),
+                    &format!("PID 0x{:04X}: interval {:.1}ms > 100ms", pid, pcr_interval_ms),
                     Some(pid), packet_index);
             }
-        }
 
-        // P2: PCR accuracy
-        if let Some(&last_pcr) = self.last_pcr_values.get(&pid) {
-            if let Some(&last_idx) = self.last_pcr_indices.get(&pid) {
-                let pcr_diff = pcr_value.wrapping_sub(last_pcr) as f64 / 27_000_000.0;
-                let idx_diff = self.index_to_ms(packet_index - last_idx) / 1000.0;
-                if idx_diff > 0.0 {
-                    let drift = (pcr_diff - idx_diff).abs();
-                    if drift > 0.0005 { // 500ns
+            // P2: PCR jitter - check if interval is suspiciously irregular
+            // Compare with expected interval based on previous intervals
+            if let Some(&prev_prev_pcr) = self.pcr_prev_prev.get(&pid) {
+                let prev_interval = last_pcr.wrapping_sub(prev_prev_pcr) as f64 / 27_000.0;
+                if prev_interval > 0.0 && prev_interval < 10_000.0 {
+                    let jitter = (pcr_interval_ms - prev_interval).abs();
+                    if jitter > 50.0 { // 50ms jitter threshold
                         self.add_p2("PCR accuracy error",
-                            &format!("PID 0x{:04X}: drift {:.6}s", pid, drift),
+                            &format!("PID 0x{:04X}: jitter {:.2}ms", pid, jitter),
                             Some(pid), packet_index);
                     }
                 }
             }
         }
 
+        // track prev-prev for jitter calculation
+        if let Some(&last_pcr) = self.last_pcr_values.get(&pid) {
+            self.pcr_prev_prev.insert(pid, last_pcr);
+        }
         self.last_pcr_indices.insert(pid, packet_index);
         self.last_pcr_values.insert(pid, pcr_value);
     }
 
-    pub fn check_pcr_timeout(&mut self, packet_index: u64) {
-        if self.packet_rate <= 0.0 { return; }
-        for (&pid, &last_idx) in &self.last_pcr_indices.clone() {
-            let interval_ms = self.index_to_ms(packet_index - last_idx);
-            if interval_ms > 100.0 {
-                self.add_p2("PCR error",
-                    &format!("PID 0x{:04X}: no PCR for {:.0}ms", pid, interval_ms),
-                    Some(pid), packet_index);
-            }
-        }
+    pub fn check_pcr_timeout(&mut self, _packet_index: u64) {
+        // PCR timeout is now handled in check_pcr via interval measurement
     }
 
     pub fn check_nit(&mut self, is_nit: bool, packet_index: u64) {

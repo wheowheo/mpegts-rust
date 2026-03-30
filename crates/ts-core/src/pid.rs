@@ -54,9 +54,12 @@ impl PidMap {
             info.has_pcr = true;
         }
 
-        let expected = (info.last_cc + 1) & 0x0F;
-        if cc != expected && info.packet_count > 1 {
-            info.cc_errors += 1;
+        // Null packets (0x1FFF) don't carry meaningful CC
+        if pid != PID_NULL {
+            let expected = (info.last_cc + 1) & 0x0F;
+            if cc != expected && info.packet_count > 1 {
+                info.cc_errors += 1;
+            }
         }
         info.last_cc = cc;
     }
