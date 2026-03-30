@@ -2,19 +2,12 @@ use std::path::Path;
 use ts_core::packet::TS_PACKET_SIZE;
 use ts_analyzer::StreamAnalyzer;
 
-pub fn analyze_file(path: &Path) -> std::io::Result<StreamAnalyzer> {
-    let data = std::fs::read(path)?;
+pub fn analyze_bytes(data: &[u8], filename: &str) -> StreamAnalyzer {
     let mut analyzer = StreamAnalyzer::new();
-
-    let filename = path
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
-    analyzer.set_filename(&filename);
+    analyzer.set_filename(filename);
 
     let mut offset = 0;
 
-    // sync byte 탐색
     while offset < data.len() {
         if data[offset] == 0x47 {
             break;
@@ -27,5 +20,15 @@ pub fn analyze_file(path: &Path) -> std::io::Result<StreamAnalyzer> {
         offset += TS_PACKET_SIZE;
     }
 
-    Ok(analyzer)
+    analyzer
+}
+
+#[allow(dead_code)]
+pub fn analyze_file(path: &Path) -> std::io::Result<StreamAnalyzer> {
+    let data = std::fs::read(path)?;
+    let filename = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    Ok(analyze_bytes(&data, &filename))
 }

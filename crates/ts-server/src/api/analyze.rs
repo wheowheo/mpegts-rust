@@ -5,8 +5,8 @@ use axum::{
 };
 use serde::Serialize;
 use std::sync::Arc;
-use ts_core::packet::TS_PACKET_SIZE;
 use crate::state::AppState;
+use crate::ingest::file::analyze_bytes;
 
 #[derive(Serialize)]
 pub struct AnalyzeResponse {
@@ -42,40 +42,12 @@ pub async fn start_analysis(
     }
 
     let ws_tx = state.ws_tx.clone();
+    let result = analyze_bytes(&file_data, &filename);
 
-    // 분석 실행
     {
         let mut analyzer = state.analyzer.write().await;
-        *analyzer = ts_analyzer::StreamAnalyzer::new();
-        analyzer.set_filename(&filename);
+        *analyzer = result;
 
-        let mut offset = 0;
-
-        // sync byte 탐색
-        while offset < file_data.len() {
-            if file_data[offset] == 0x47 {
-                break;
-            }
-            offset += 1;
-        }
-
-        while offset + TS_PACKET_SIZE <= file_data.len() {
-            analyzer.feed_packet(&file_data[offset..offset + TS_PACKET_SIZE]);
-            offset += TS_PACKET_SIZE;
-
-            // 일정 주기마다 WebSocket으로 실시간 데이터 전송
-            if analyzer.total_packets() % 10000 == 0 {
-                if let Ok(json) = serde_json::to_string(&serde_json::json!({
-                    "total_bitrate_bps": analyzer.bitrate_stats.latest_total_bitrate(),
-                    "pcr_jitter_ms": analyzer.pcr_jitter.average_jitter_ms(),
-                    "total_packets": analyzer.total_packets(),
-                })) {
-                    let _ = ws_tx.send(json);
-                }
-            }
-        }
-
-        // 최종 데이터 전송
         let info = analyzer.stream_info();
         if let Ok(json) = serde_json::to_string(&serde_json::json!({
             "total_bitrate_bps": info.total_bitrate_bps,
