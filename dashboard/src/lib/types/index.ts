@@ -61,6 +61,14 @@ export interface Alert {
 	timestamp_sec: number;
 }
 
+export interface RtpInfo {
+	ssrc: number;
+	sequence: number;
+	timestamp: number;
+	payload_type: number;
+	ts_per_packet: number;
+}
+
 export interface OutputStatus {
 	session_id: string;
 	running: boolean;
@@ -70,6 +78,13 @@ export interface OutputStatus {
 	elapsed_sec: number;
 	actual_bitrate_bps: number;
 	alerts: Alert[];
+	source_packets: number;
+	loop_count: number;
+	source_position: number;
+	packets_per_burst: number;
+	burst_interval_us: number;
+	bitrate_deviation_pct: number;
+	rtp_info: RtpInfo | null;
 }
 
 export interface SystemSnapshot {

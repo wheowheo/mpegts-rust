@@ -51,6 +51,15 @@ pub enum AlertLevel {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RtpInfo {
+    pub ssrc: u32,
+    pub sequence: u16,
+    pub timestamp: u32,
+    pub payload_type: u8,
+    pub ts_per_packet: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct OutputStatus {
     pub session_id: String,
     pub running: bool,
@@ -60,6 +69,13 @@ pub struct OutputStatus {
     pub elapsed_sec: f64,
     pub actual_bitrate_bps: f64,
     pub alerts: Vec<Alert>,
+    pub source_packets: u64,
+    pub loop_count: u64,
+    pub source_position: u64,
+    pub packets_per_burst: usize,
+    pub burst_interval_us: u64,
+    pub bitrate_deviation_pct: f64,
+    pub rtp_info: Option<RtpInfo>,
 }
 
 const BITRATE_DEVIATION_WARN: f64 = 0.05; // 5%
@@ -175,6 +191,14 @@ impl OutputSessionManager {
         let (stop_tx, _) = broadcast::channel(1);
         let mut stop_rx = stop_tx.subscribe();
 
+        let source_packets = packets.len() as u64;
+        let pre_bitrate = config.bitrate_bps;
+        let pre_burst: usize = 7;
+        let bits_per_burst = pre_burst as u64 * TS_PACKET_SIZE as u64 * 8;
+        let burst_interval_us = if pre_bitrate > 0 {
+            (bits_per_burst as f64 / pre_bitrate as f64 * 1_000_000.0) as u64
+        } else { 0 };
+
         let status = Arc::new(RwLock::new(OutputStatus {
             session_id: session_id.clone(),
             running: true,
@@ -184,6 +208,13 @@ impl OutputSessionManager {
             elapsed_sec: 0.0,
             actual_bitrate_bps: 0.0,
             alerts: Vec::new(),
+            source_packets,
+            loop_count: 0,
+            source_position: 0,
+            packets_per_burst: pre_burst,
+            burst_interval_us,
+            bitrate_deviation_pct: 0.0,
+            rtp_info: None,
         }));
 
         let task_status = status.clone();
@@ -233,12 +264,19 @@ impl OutputSessionManager {
                                 let actual_bps = if elapsed > 0.0 {
                                     bytes as f64 * 8.0 / elapsed
                                 } else { 0.0 };
+                                let src_total = packets.len() as u64;
 
                                 let mut s = task_status.write().await;
                                 s.packets_sent = total_sent;
                                 s.bytes_sent = bytes;
                                 s.elapsed_sec = elapsed;
                                 s.actual_bitrate_bps = actual_bps;
+                                s.loop_count = total_sent / src_total;
+                                s.source_position = total_sent % src_total;
+                                let target = s.config.as_ref().map(|c| c.bitrate_bps as f64).unwrap_or(0.0);
+                                s.bitrate_deviation_pct = if target > 0.0 {
+                                    (actual_bps - target) / target * 100.0
+                                } else { 0.0 };
                                 check_alerts(&mut s);
                             }
                         }
@@ -273,12 +311,26 @@ impl OutputSessionManager {
                                 let actual_bps = if elapsed > 0.0 {
                                     bytes as f64 * 8.0 / elapsed
                                 } else { 0.0 };
+                                let src_total = packets.len() as u64;
 
                                 let mut s = task_status.write().await;
                                 s.packets_sent = total_sent;
                                 s.bytes_sent = bytes;
                                 s.elapsed_sec = elapsed;
                                 s.actual_bitrate_bps = actual_bps;
+                                s.loop_count = total_sent / src_total;
+                                s.source_position = total_sent % src_total;
+                                let target = s.config.as_ref().map(|c| c.bitrate_bps as f64).unwrap_or(0.0);
+                                s.bitrate_deviation_pct = if target > 0.0 {
+                                    (actual_bps - target) / target * 100.0
+                                } else { 0.0 };
+                                s.rtp_info = Some(RtpInfo {
+                                    ssrc: sender.ssrc(),
+                                    sequence: sender.sequence(),
+                                    timestamp: sender.timestamp(),
+                                    payload_type: 33,
+                                    ts_per_packet: 7,
+                                });
                                 check_alerts(&mut s);
                             }
 

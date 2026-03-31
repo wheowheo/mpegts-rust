@@ -77,4 +77,8 @@ impl RtpSender {
         let ticks = (duration_sec * RTP_CLOCK_RATE as f64) as u32;
         self.timestamp = self.timestamp.wrapping_add(ticks);
     }
+
+    pub fn ssrc(&self) -> u32 { self.ssrc }
+    pub fn sequence(&self) -> u16 { self.sequence }
+    pub fn timestamp(&self) -> u32 { self.timestamp }
 }
