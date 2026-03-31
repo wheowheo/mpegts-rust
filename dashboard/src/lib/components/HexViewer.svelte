@@ -187,7 +187,7 @@
 			<span class="lg r-payload">Payload</span>
 		</div>
 
-		<div class="hex-table" role="grid" onmouseleave={() => hoverByte = null}>
+		<div class="hex-table" role="grid" tabindex="0" onmouseleave={() => hoverByte = null}>
 			<div class="hex-row hex-hdr">
 				<span class="addr">ADDR</span>
 				<span class="hex-cols">

@@ -72,12 +72,12 @@
 	{:else}
 		<div class="input-form">
 			<div class="form-row">
-				<label class="form-label">Stream URL</label>
-				<input type="text" bind:value={url} placeholder="udp://239.x.x.x:port" class="form-input" />
+				<label class="form-label" for="stream-url">Stream URL</label>
+				<input id="stream-url" type="text" bind:value={url} placeholder="udp://239.x.x.x:port" class="form-input" />
 			</div>
 			<div class="form-row">
-				<label class="form-label">Protocol</label>
-				<select bind:value={protocol} class="form-select">
+				<label class="form-label" for="stream-protocol">Protocol</label>
+				<select id="stream-protocol" bind:value={protocol} class="form-select">
 					{#each protocols as p}
 						<option value={p.value}>{p.label}</option>
 					{/each}
